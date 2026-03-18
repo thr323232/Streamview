@@ -580,8 +580,9 @@ body{font-family:'Outfit',system-ui,sans-serif;background:var(--bg);color:var(--
     <div class="mdl-body">
       <label class="mdl-lbl" for="plinput">Paste M3U content or enter a playlist URL</label>
       <textarea id="plinput" spellcheck="false" placeholder="#EXTM3U&#10;#EXTINF:-1 group-title=&quot;News&quot; tvg-logo=&quot;https://…&quot;,Channel Name&#10;https://stream.example.com/live.m3u8&#10;&#10;— or a URL: https://example.com/playlist.m3u"></textarea>
-      <p class="mdl-hint">Supports M3U/M3U8 with <code>#EXTINF</code> entries. EPG loaded automatically from <code>url-tvg</code> if present.</p>
+      <p class="mdl-hint">Supports M3U/M3U8 with <code>#EXTINF</code> entries. EPG loaded automatically from <code>url-tvg</code> if present. Your URL is saved and reloaded automatically on next launch.</p>
       <div class="mdl-acts">
+        <button class="btn btn-g" id="mdl-clear" style="margin-right:auto" title="Forget saved playlist URL">Clear saved</button>
         <button class="btn btn-g" id="mdl-cancel">Cancel</button>
         <button class="btn btn-p" id="mdl-load"><span class="bt">Load</span></button>
       </div>
@@ -829,12 +830,23 @@ function updateEPGDisplay(){
   }
 }
 
-// ── CORS fetch ─────────────────────────────────────────────────
+// ── Fetch helper ───────────────────────────────────────────────
+// In Electron, webSecurity is disabled so direct fetch always works.
+// In a plain browser, fall back to public CORS proxies.
+const IS_ELECTRON = navigator.userAgent.includes('Electron');
+
 const PROXIES=[
   u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
   u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
 ];
 async function corsGet(url){
+  // Electron: no CORS restrictions, just fetch directly
+  if(IS_ELECTRON){
+    const r=await fetch(url,{signal:AbortSignal.timeout(20000)});
+    if(r.ok) return await r.text();
+    throw new Error('HTTP '+r.status);
+  }
+  // Browser: try direct first, then proxies
   try{
     const r=await fetch(url,{mode:'cors',signal:AbortSignal.timeout(12000)});
     if(r.ok) return await r.text();
@@ -903,6 +915,8 @@ async function loadPlaylist(raw){
   });
 
   modalOv.classList.remove('on');
+  // Persist the source so it reloads automatically next launch
+  if(isUrl) try{ localStorage.setItem('sv_playlist_url', text); } catch(_){}
   toast(`Loaded ${parsed.channels.length} channels`,'ok');
   countBadge.textContent=parsed.channels.length+' ch';
   countBadge.classList.add('on');
@@ -1538,6 +1552,11 @@ $('load-btn').addEventListener('click',openModal);
 $('welcome-btn').addEventListener('click',openModal);
 $('mdl-x').addEventListener('click',()=>modalOv.classList.remove('on'));
 $('mdl-cancel').addEventListener('click',()=>modalOv.classList.remove('on'));
+$('mdl-clear').addEventListener('click',()=>{
+  localStorage.removeItem('sv_playlist_url');
+  plinput.value='';
+  toast('Saved playlist cleared','inf');
+});
 modalOv.addEventListener('click',e=>{ if(e.target===modalOv) modalOv.classList.remove('on'); },{passive:true});
 $('mdl-load').addEventListener('click',async()=>{ await loadPlaylist(plinput.value); if(!modalOv.classList.contains('on')) plinput.value=''; });
 plinput.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&e.key==='Enter') $('mdl-load').click(); });
@@ -1557,8 +1576,21 @@ window.addEventListener('resize',()=>{
 
 // ── Init ──────────────────────────────────────────────────────
 setupMiniPlayer();
+
+// URL param takes priority (dev/testing use)
 const pp=new URLSearchParams(location.search).get('playlist');
-if(pp){ plinput.value=pp; loadPlaylist(pp); }
+if(pp){
+  plinput.value=pp; loadPlaylist(pp);
+} else {
+  // Auto-restore last playlist so the user never has to re-enter it
+  const saved=localStorage.getItem('sv_playlist_url');
+  if(saved){
+    plinput.value=saved;
+    // Show a quiet loading indicator while we fetch in background
+    toast('Restoring playlist…','inf',2000);
+    loadPlaylist(saved);
+  }
+}
 </script>
 </body>
 </html>
