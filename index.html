@@ -1031,8 +1031,14 @@
           }
         }
         current = null;
-      } else if (!line.startsWith('#') && !current) {
-        // bare URL with no EXTINF
+      } else if (!line.startsWith('#') && !current && line.match(/^https?:\/\//i)) {
+        // Bare URL with no preceding #EXTINF — use URL path as name
+        const urlName = decodeURIComponent(line.split('/').pop().split('?')[0]) || line;
+        const key = `${urlName}||${line}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          channels.push({ name: urlName, group: 'Uncategorized', logo: '', tvgId: '', url: line });
+        }
       }
     }
     return channels;
@@ -1095,10 +1101,35 @@
         return;
       }
       $('modal-load-btn').classList.remove('loading');
+
+      // Strip UTF-8 BOM if present
+      if (m3uText.charCodeAt(0) === 0xFEFF) m3uText = m3uText.slice(1);
+
+      // Detect proxy returning HTML error page instead of playlist
+      const trimmed = m3uText.trimStart();
+      if (trimmed.startsWith('<!') || trimmed.startsWith('<html')) {
+        toast('Proxy returned an HTML page — the playlist URL may be invalid or blocked', 'error');
+        return;
+      }
+
+      // Some proxies wrap content in JSON: {"contents":"..."}
+      if (trimmed.startsWith('{') && trimmed.includes('"contents"')) {
+        try {
+          const json = JSON.parse(m3uText);
+          if (json.contents) m3uText = json.contents;
+        } catch(_) {}
+      }
     }
 
-    if (!m3uText.includes('#EXTM3U') && !m3uText.includes('#EXTINF')) {
-      toast('No valid M3U content found', 'error');
+    // Lenient check: accept if it looks like M3U or has bare stream URLs
+    const hasExtinf  = m3uText.includes('#EXTINF');
+    const hasExtm3u  = m3uText.includes('#EXTM3U');
+    const hasBareUrl = /^https?:\/\//m.test(m3uText);
+
+    if (!hasExtinf && !hasExtm3u && !hasBareUrl) {
+      // Show first 120 chars to help the user understand what arrived
+      const preview = m3uText.slice(0, 120).replace(/\n/g, '↵');
+      toast(`No M3U content found. Got: "${preview}"`, 'error', 5000);
       return;
     }
 
