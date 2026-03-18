@@ -631,6 +631,7 @@ const S = {
   miniObserver:  null,
   isMini:        false,
   isChView:      false,
+  switching:     false,   // true during detach→attach; suppresses spurious errors
 };
 
 // Persist
@@ -1348,7 +1349,7 @@ function ensureHLS(){
   if(!S.hlsInst){
     S.hlsInst=new Hls({ maxBufferLength:30, maxMaxBufferLength:60, lowLatencyMode:false, enableWorker:true });
     S.hlsInst.on(Hls.Events.MANIFEST_PARSED,()=>video.play().catch(()=>{}));
-    S.hlsInst.on(Hls.Events.ERROR,(_,data)=>{ if(data.fatal) handleError(data.details); });
+    S.hlsInst.on(Hls.Events.ERROR,(_,data)=>{ if(data.fatal&&!S.switching) handleError(data.details); });
     hlsReady=true;
   }
   return true;
@@ -1393,33 +1394,49 @@ function playChannel(ch){
 function startStream(url){
   const isHLS=/\.m3u8/i.test(url)||/\bhls\b/i.test(url)||/\/live/i.test(url)||!/\.(mp4|mkv|avi|mov|wmv)(\?|$)/i.test(url);
   if(ensureHLS()&&isHLS){
+    S.switching=true;
     S.hlsInst.stopLoad();
     S.hlsInst.detachMedia();
     S.hlsInst.loadSource(url);
     S.hlsInst.attachMedia(video);
+    // Clear the guard once hls.js has re-attached and a small settle time has passed
+    S.hlsInst.once(Hls.Events.MEDIA_ATTACHED, ()=>{ setTimeout(()=>{ S.switching=false; }, 200); });
   } else if(video.canPlayType('application/vnd.apple.mpegurl')&&isHLS){
+    S.switching=false;
     video.src=url; video.load(); video.play().catch(()=>{});
   } else {
+    S.switching=true;
     if(S.hlsInst){ S.hlsInst.stopLoad(); S.hlsInst.detachMedia(); }
+    S.switching=false;
     video.src=url; video.load(); video.play().catch(()=>{});
   }
 }
 
-// ── Error / retry (exponential backoff) ───────────────────────
-const RETRY_DELAYS=[1000,3000,8000];
+// ── Error / retry (exponential backoff + native fallback) ──────
+const RETRY_DELAYS=[1500,4000,9000];
 function handleError(detail){
+  if(!S.currentCh) return;
+  const erroredCh=S.currentCh;   // pin channel so a later switch can't consume retries
+
   if(S.retryCount<3){
     const delay=RETRY_DELAYS[S.retryCount++];
     bufOv.classList.add('on'); errOv.classList.remove('on');
     toast(`Retrying… (${S.retryCount}/3)`,'inf',1800);
     S.retryTimer=setTimeout(()=>{
+      if(S.currentCh!==erroredCh) return; // user switched away — abort
       if(S.hlsInst){ S.hlsInst.stopLoad(); S.hlsInst.detachMedia(); S.hlsInst.destroy(); S.hlsInst=null; }
       startStream(S.currentCh.url);
     },delay);
+  } else if(S.hlsInst){
+    // HLS exhausted — try native video (some streams work without hls.js)
+    toast('HLS failed — trying direct playback…','inf',2200);
+    S.hlsInst.stopLoad(); S.hlsInst.detachMedia(); S.hlsInst.destroy(); S.hlsInst=null;
+    S.retryCount=0;   // give the native path its own retry budget
+    video.src=erroredCh.url; video.load(); video.play().catch(()=>{});
   } else {
     const id=chId(S.currentCh); S.deadIds.add(id);
     bufOv.classList.remove('on'); errOv.classList.add('on');
-    errMsg.textContent='Stream unavailable after 3 retries';
+    errMsg.textContent='Stream unavailable — try another channel or retry';
     const el=document.querySelector('.ch-item[data-id="'+CSS.escape(id)+'"]');
     if(el) el.classList.add('dead');
     toast('Stream failed','err');
@@ -1430,9 +1447,13 @@ function handleError(detail){
 video.addEventListener('waiting',  ()=>bufOv.classList.add('on'));
 video.addEventListener('playing',  ()=>{ bufOv.classList.remove('on'); errOv.classList.remove('on'); S.retryCount=0; });
 video.addEventListener('canplay',  ()=>bufOv.classList.remove('on'));
-video.addEventListener('error',    ()=>{ if(S.currentCh) handleError('mediaError'); });
+// When hls.js manages the video it intercepts errors itself via Hls.Events.ERROR.
+// The native 'error' event during that path (e.g. from detachMedia clearing src) is spurious.
+video.addEventListener('error',    ()=>{ if(S.currentCh&&!S.hlsInst&&!S.switching) handleError('mediaError'); });
 video.addEventListener('stalled',  ()=>{
-  if(S.currentCh) setTimeout(()=>{ if(video.paused&&S.currentCh) handleError('stalled'); },8000);
+  // Pin the channel at the moment of stall so a later switch doesn't misfire.
+  const stalledCh=S.currentCh;
+  if(stalledCh) setTimeout(()=>{ if(video.paused&&S.currentCh===stalledCh) handleError('stalled'); },8000);
 });
 video.addEventListener('volumechange',()=>{ if(S.currentCh) S.volMap[chId(S.currentCh)]=video.volume; });
 
