@@ -401,44 +401,32 @@ async function streamText(response, label) {
 async function fetchText(url, label, validate) {
   const T = 300000; // 5-min timeout — large EPG/M3U files can be 100+ MB
 
-  async function attempt(fetchUrl) {
+  async function attempt(fetchUrl, skipValidate = false) {
     const r = await fetch(fetchUrl, { signal: AbortSignal.timeout(T) });
-    if (!r.ok) return null;
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const text = await streamText(r, label);
-    if (validate && !validate(text)) return null;
+    if (!skipValidate && validate && !validate(text)) throw new Error('Invalid content');
     return text;
   }
 
   // Electron: direct fetch, no CORS issues
-  if (IS_ELECTRON) {
-    const t = await attempt(url);
-    if (t != null) return t;
-    throw new Error('Fetch failed');
-  }
+  if (IS_ELECTRON) return attempt(url);
 
-  // 1. Cloudflare Worker (user-configured, preferred)
+  // 1. Cloudflare Worker — trusted, skip content validation
   const worker = proxyFor(url);
   if (worker) {
-    try { const t = await attempt(worker); if (t != null) return t; } catch (_) {}
+    try { return await attempt(worker, true); } catch (e) {
+      console.warn('Worker failed:', e.message);
+    }
   }
 
   // 2. Direct CORS fetch
-  try {
-    const r = await fetch(url, { mode: 'cors', signal: AbortSignal.timeout(T) });
-    if (r.ok) {
-      const text = await streamText(r, label);
-      if (!validate || validate(text)) return text;
-    }
-  } catch (_) {}
+  try { return await attempt(url); } catch (_) {}
 
   // 3. Public CORS proxies (last resort)
   let last;
   for (const mk of PUBLIC_PROXIES) {
-    try {
-      const t = await attempt(mk(url));
-      if (t != null) return t;
-      last = new Error('Proxy returned invalid content');
-    } catch (e) { last = e; }
+    try { return await attempt(mk(url)); } catch (e) { last = e; }
   }
   throw last || new Error('All fetch attempts failed');
 }
