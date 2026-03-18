@@ -186,6 +186,15 @@ input.field{height:34px;padding:0 10px;font-size:13px}
 .hint{font-size:11px;color:var(--t3);margin-top:6px;line-height:1.6}
 .hint code{color:var(--acc)}
 .mf{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+/* ── Modal tabs ── */
+.modal-tabs{display:flex;border-bottom:1px solid var(--b);flex-shrink:0}
+.mtab{
+  flex:1;padding:9px 0;background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--t2);font-size:13px;font-weight:500;font-family:inherit;
+  cursor:pointer;transition:all .15s;margin-bottom:-1px;
+}
+.mtab.on{color:var(--acc);border-bottom-color:var(--acc)}
+.mtab:hover:not(.on){color:var(--t)}
 
 /* ── Mobile ── */
 @media(max-width:680px){
@@ -250,14 +259,32 @@ input.field{height:34px;padding:0 10px;font-size:13px}
       <span class="mh-title">Load Playlist</span>
       <button class="mx" id="pl-close">✕</button>
     </div>
+    <div class="modal-tabs">
+      <button class="mtab on" id="tab-m3u">M3U URL</button>
+      <button class="mtab" id="tab-xt">Xtream Codes</button>
+    </div>
     <div class="mb">
-      <label class="lbl">M3U URL or paste playlist content</label>
-      <textarea class="field" id="pl-inp" rows="6"
-        placeholder="https://example.com/playlist.m3u&#10;&#10;— or paste:&#10;#EXTM3U&#10;#EXTINF:-1 group-title=&quot;News&quot;,Channel&#10;https://stream.url/live.m3u8"></textarea>
-      <p class="hint">
-        Paste an M3U URL or raw content. If you get CORS errors, deploy
-        <code>worker.js</code> to Cloudflare and add the URL via ⚙ Proxy.
-      </p>
+      <!-- M3U panel -->
+      <div id="panel-m3u">
+        <label class="lbl">M3U URL or paste playlist content</label>
+        <textarea class="field" id="pl-inp" rows="5"
+          placeholder="https://example.com/playlist.m3u&#10;&#10;— or paste:&#10;#EXTM3U&#10;#EXTINF:-1 group-title=&quot;News&quot;,Channel&#10;https://stream.url/live.m3u8"></textarea>
+        <p class="hint">
+          Paste an M3U URL or raw content. If you get CORS errors, deploy
+          <code>worker.js</code> to Cloudflare and add the URL via ⚙ Proxy.
+        </p>
+      </div>
+      <!-- Xtream Codes panel -->
+      <div id="panel-xt" style="display:none">
+        <label class="lbl">Server URL</label>
+        <input class="field" id="xt-server" type="url" placeholder="http://server:port"
+          autocomplete="off" spellcheck="false"/>
+        <label class="lbl">Username</label>
+        <input class="field" id="xt-user" type="text" placeholder="username" autocomplete="off"/>
+        <label class="lbl">Password</label>
+        <input class="field" id="xt-pass" type="password" placeholder="password" autocomplete="off"/>
+        <p class="hint">Fetches your full M3U playlist via the Xtream Codes API.</p>
+      </div>
       <div class="mf">
         <button class="btn btn-g" id="pl-clear" style="margin-right:auto">Clear saved</button>
         <button class="btn btn-g" id="pl-cancel">Cancel</button>
@@ -796,18 +823,46 @@ $('sb-search').addEventListener('input', e => {
 }, { passive: true });
 
 // ── Load Playlist Modal ───────────────────────────────────────
-function openPl() { $('pl-ov').classList.add('on'); setTimeout(() => $('pl-inp').focus(), 50); }
+let activeTab = 'm3u';
 
+function switchTab(tab) {
+  activeTab = tab;
+  $('tab-m3u').classList.toggle('on', tab === 'm3u');
+  $('tab-xt').classList.toggle('on',  tab === 'xt');
+  $('panel-m3u').style.display = tab === 'm3u' ? '' : 'none';
+  $('panel-xt').style.display  = tab === 'xt'  ? '' : 'none';
+}
+
+function openPl() {
+  $('pl-ov').classList.add('on');
+  setTimeout(() => (activeTab === 'm3u' ? $('pl-inp') : $('xt-server')).focus(), 50);
+}
+
+function loadXtream() {
+  const server = $('xt-server').value.trim().replace(/\/+$/, '');
+  const user   = $('xt-user').value.trim();
+  const pass   = $('xt-pass').value.trim();
+  if (!server || !user || !pass) { toast('Fill in all three Xtream fields', 'err'); return; }
+  try { new URL(server); } catch (_) { toast('Invalid server URL', 'err'); return; }
+  const url = `${server}/get.php?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}&type=m3u_plus&output=ts`;
+  try { localStorage.setItem('sv_xt', JSON.stringify({ server, user, pass })); } catch (_) {}
+  loadPlaylist(url);
+}
+
+$('tab-m3u').addEventListener('click', () => switchTab('m3u'));
+$('tab-xt').addEventListener('click',  () => switchTab('xt'));
 $('load-btn').addEventListener('click', openPl);
 $('pl-close').addEventListener('click',  () => $('pl-ov').classList.remove('on'));
 $('pl-cancel').addEventListener('click', () => $('pl-ov').classList.remove('on'));
 $('pl-ov').addEventListener('click', e => { if (e.target === $('pl-ov')) $('pl-ov').classList.remove('on'); }, { passive: true });
-$('pl-load').addEventListener('click', () => loadPlaylist($('pl-inp').value));
+$('pl-load').addEventListener('click', () => { if (activeTab === 'xt') loadXtream(); else loadPlaylist($('pl-inp').value); });
 $('pl-inp').addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') $('pl-load').click(); });
 $('pl-clear').addEventListener('click', () => {
   localStorage.removeItem('sv_url');
+  localStorage.removeItem('sv_xt');
   $('pl-inp').value = '';
-  toast('Saved URL cleared', 'inf');
+  $('xt-server').value = ''; $('xt-user').value = ''; $('xt-pass').value = '';
+  toast('Saved credentials cleared', 'inf');
 });
 
 // ── Proxy Settings Modal ──────────────────────────────────────
@@ -849,11 +904,28 @@ document.addEventListener('keydown', e => {
 // ── Init ──────────────────────────────────────────────────────
 showState('idle');
 
-const saved = localStorage.getItem('sv_url');
-if (saved) {
-  $('pl-inp').value = saved;
-  toast('Restoring playlist…', 'inf', 2000);
-  loadPlaylist(saved);
+// Restore Xtream credentials into fields
+const savedXt = localStorage.getItem('sv_xt');
+if (savedXt) {
+  try {
+    const { server, user, pass } = JSON.parse(savedXt);
+    $('xt-server').value = server || '';
+    $('xt-user').value   = user   || '';
+    $('xt-pass').value   = pass   || '';
+    if (server && user && pass) {
+      switchTab('xt');
+      const url = `${server}/get.php?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}&type=m3u_plus&output=ts`;
+      toast('Restoring Xtream playlist…', 'inf', 2000);
+      loadPlaylist(url);
+    }
+  } catch (_) {}
+} else {
+  const saved = localStorage.getItem('sv_url');
+  if (saved) {
+    $('pl-inp').value = saved;
+    toast('Restoring playlist…', 'inf', 2000);
+    loadPlaylist(saved);
+  }
 }
 </script>
 </body>
