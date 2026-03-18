@@ -373,6 +373,8 @@
     }
 
     .section-label {
+      height: 28px;
+      box-sizing: border-box;
       padding: 10px 14px 4px;
       font-size: 10px;
       font-weight: 600;
@@ -383,6 +385,8 @@
 
     /* Channel Item */
     .channel-item {
+      height: 59px;
+      box-sizing: border-box;
       display: flex;
       align-items: center;
       gap: 10px;
@@ -929,6 +933,9 @@
     retryTimer: null,
     isMiniPlayer: false,
     isChannelView: false,  // mobile: are we showing channel list?
+    vRows: null,           // flat row array for virtual scroll
+    vOffsets: null,        // cumulative pixel offsets (Int32Array, length = vRows+1)
+    vTotalH: 0,            // total scrollable height in px
   };
 
   // ===== DOM refs =====
@@ -1169,6 +1176,11 @@
     });
   }
 
+  // ===== Virtual Scroll Constants =====
+  const CHANNEL_H = 59; // must match CSS height for .channel-item
+  const LABEL_H   = 28; // must match CSS height for .section-label
+  const VBUFFER   = 8;  // extra rows to render above/below viewport
+
   // ===== Render Channels =====
   function renderChannels() {
     if (!state.channels.length) return;
@@ -1182,7 +1194,6 @@
     } else if (state.currentGroup === 'Recent') {
       const recentSet = new Set(state.recentIds);
       list = list.filter(c => recentSet.has(channelId(c)));
-      // sort by recency
       list = [...list].sort((a, b) => state.recentIds.indexOf(channelId(a)) - state.recentIds.indexOf(channelId(b)));
     } else if (state.currentGroup !== 'All') {
       list = list.filter(c => c.group === state.currentGroup);
@@ -1204,43 +1215,100 @@
 
     noResults.classList.toggle('visible', list.length === 0 && (q || state.currentGroup !== 'All'));
 
-    // Build sections
-    channelList.innerHTML = '';
-
+    // Build flat row array for virtual scroll
+    const rows = [];
     if (state.currentGroup === 'All' && !q) {
-      // Show Recent section at top
       if (state.recentIds.length > 0) {
         const recentChannels = state.recentIds
           .map(id => state.channels.find(c => channelId(c) === id))
           .filter(Boolean);
         if (recentChannels.length) {
-          appendSectionLabel('Recently Played');
-          recentChannels.forEach(ch => appendChannelItem(ch));
+          rows.push({ type: 'label', text: 'Recently Played' });
+          recentChannels.forEach(ch => rows.push({ type: 'channel', ch }));
         }
       }
-      // Group by group-title
       const grouped = {};
       list.forEach(c => {
         if (!grouped[c.group]) grouped[c.group] = [];
         grouped[c.group].push(c);
       });
       Object.keys(grouped).sort().forEach(grp => {
-        appendSectionLabel(grp);
-        grouped[grp].forEach(ch => appendChannelItem(ch));
+        rows.push({ type: 'label', text: grp });
+        grouped[grp].forEach(ch => rows.push({ type: 'channel', ch }));
       });
     } else {
-      list.forEach(ch => appendChannelItem(ch));
+      list.forEach(ch => rows.push({ type: 'channel', ch }));
     }
+
+    // Precompute cumulative offsets for O(log n) scroll lookup
+    const offsets = new Int32Array(rows.length + 1);
+    for (let i = 0; i < rows.length; i++) {
+      offsets[i + 1] = offsets[i] + (rows[i].type === 'label' ? LABEL_H : CHANNEL_H);
+    }
+    state.vRows = rows;
+    state.vOffsets = offsets;
+    state.vTotalH = offsets[rows.length];
+
+    // Build virtual scroll scaffold
+    channelList.innerHTML =
+      '<div id="vs-top"></div><div id="vs-content"></div><div id="vs-bot"></div>';
+
+    channelList.scrollTop = 0;
+    renderVisibleRows();
   }
 
-  function appendSectionLabel(text) {
+  function renderVisibleRows() {
+    const rows    = state.vRows;
+    const offsets = state.vOffsets;
+    if (!rows || !rows.length) return;
+
+    const scrollTop = channelList.scrollTop;
+    const viewH     = channelList.clientHeight;
+    const totalH    = state.vTotalH;
+
+    // Binary search: first row whose bottom edge is > scrollTop
+    let lo = 0, hi = rows.length - 1, startIdx = 0;
+    while (lo <= hi) {
+      const mid = (lo + hi) >>> 1;
+      if (offsets[mid + 1] <= scrollTop) { lo = mid + 1; }
+      else { startIdx = mid; hi = mid - 1; }
+    }
+    startIdx = Math.max(0, startIdx - VBUFFER);
+
+    // Last row whose top edge is < scrollTop + viewH
+    let endIdx = startIdx;
+    while (endIdx < rows.length - 1 && offsets[endIdx] < scrollTop + viewH) endIdx++;
+    endIdx = Math.min(rows.length - 1, endIdx + VBUFFER);
+
+    // Update spacer heights
+    const topH = offsets[startIdx];
+    const botH = Math.max(0, totalH - offsets[endIdx + 1]);
+    document.getElementById('vs-top').style.height = topH + 'px';
+    document.getElementById('vs-bot').style.height = botH + 'px';
+
+    // Render visible slice into a fragment
+    const frag = document.createDocumentFragment();
+    for (let i = startIdx; i <= endIdx; i++) {
+      const row = rows[i];
+      if (row.type === 'label') {
+        frag.appendChild(makeRowLabel(row.text));
+      } else {
+        frag.appendChild(makeChannelItem(row.ch));
+      }
+    }
+    const content = document.getElementById('vs-content');
+    content.innerHTML = '';
+    content.appendChild(frag);
+  }
+
+  function makeRowLabel(text) {
     const div = document.createElement('div');
     div.className = 'section-label';
     div.textContent = text;
-    channelList.appendChild(div);
+    return div;
   }
 
-  function appendChannelItem(ch) {
+  function makeChannelItem(ch) {
     const id = channelId(ch);
     const isActive = state.currentChannel && channelId(state.currentChannel) === id;
     const isDead   = state.deadIds.has(id);
@@ -1253,17 +1321,13 @@
     // Logo
     const logoWrap = document.createElement('div');
     logoWrap.className = 'channel-logo-wrap';
-
     if (ch.logo) {
       const img = document.createElement('img');
       img.className = 'channel-logo-img';
       img.src = ch.logo;
       img.alt = ch.name;
       img.loading = 'lazy';
-      img.onerror = () => {
-        img.style.display = 'none';
-        logoWrap.appendChild(makeFallbackLogo(ch.name));
-      };
+      img.onerror = () => { img.style.display = 'none'; logoWrap.appendChild(makeFallbackLogo(ch.name)); };
       logoWrap.appendChild(img);
     } else {
       logoWrap.appendChild(makeFallbackLogo(ch.name));
@@ -1277,17 +1341,13 @@
     favBtn.className = `fav-btn${isFav ? ' active' : ''}`;
     favBtn.title = isFav ? 'Remove from favorites' : 'Add to favorites';
     favBtn.innerHTML = isFav ? '★' : '☆';
-    favBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      toggleFavorite(id, favBtn);
-    });
+    favBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleFavorite(id, favBtn); });
 
     item.appendChild(logoWrap);
     item.appendChild(info);
     item.appendChild(favBtn);
-
     item.addEventListener('click', () => playChannel(ch));
-    channelList.appendChild(item);
+    return item;
   }
 
   function makeFallbackLogo(name) {
@@ -1610,6 +1670,11 @@
     }
     setupMiniPlayer();
   });
+
+  // ===== Virtual Scroll Listener =====
+  channelList.addEventListener('scroll', () => {
+    if (state.vRows && state.vRows.length) renderVisibleRows();
+  }, { passive: true });
 
   // ===== Init =====
   setupMiniPlayer();
