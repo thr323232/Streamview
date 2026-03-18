@@ -1,1692 +1,1539 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Streamview — IPTV Player</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>Streamview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0f;--bg2:#111118;--bg3:#18181f;--bg4:#1e1e28;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);
+  --t1:#f0f0f8;--t2:#9090a8;--t3:#505068;
+  --acc:#6c63ff;--acc2:#8a83ff;--acc-g:rgba(108,99,255,0.28);
+  --live:#ff3b3b;--vod:#22d3ee;--series:#a78bfa;
+  --ok:#22c55e;--err:#ef4444;--warn:#f59e0b;
+  --nav:60px;--r:8px;--r2:12px;--r3:18px;
+  --ease:.18s ease;--card:200px;
+}
+html{height:100%;overflow:hidden}
+body{font-family:'Outfit',system-ui,sans-serif;background:var(--bg);color:var(--t1);
+  height:100%;overflow:hidden;display:flex;flex-direction:column;
+  -webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.14);border-radius:99px}
 
-  <style>
-    /* ===== CSS Reset & Variables ===== */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ── Nav ─────────────────────────────────────────────────────── */
+#nav{
+  position:fixed;top:0;left:0;right:0;height:var(--nav);z-index:200;
+  display:flex;align-items:center;gap:8px;padding:0 20px;
+  background:rgba(10,10,15,0.96);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.nav-logo{display:flex;align-items:center;gap:8px;text-decoration:none;flex-shrink:0}
+.nav-logo-icon{width:34px;height:34px;border-radius:9px;
+  background:linear-gradient(135deg,var(--acc),#a78bfa);
+  display:flex;align-items:center;justify-content:center;font-size:16px}
+.nav-logo-text{font-size:19px;font-weight:800;letter-spacing:-.3px;
+  background:linear-gradient(135deg,#fff 0%,var(--acc2) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+#nav-tabs{display:flex;align-items:center;gap:2px;flex:1;padding:0 8px}
+.ntab{padding:7px 13px;border:none;background:none;color:var(--t2);
+  font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;
+  cursor:pointer;border-radius:var(--r);transition:all var(--ease);
+  white-space:nowrap;position:relative;-webkit-tap-highlight-color:transparent}
+.ntab:hover{color:var(--t1);background:rgba(255,255,255,0.05)}
+.ntab.active{color:var(--t1);font-weight:700}
+.ntab.active::after{content:'';position:absolute;bottom:-2px;left:13px;right:13px;
+  height:2px;background:var(--acc);border-radius:99px}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+#count-badge{font-size:11px;background:var(--bg3);border:1px solid var(--border);
+  color:var(--t2);padding:3px 9px;border-radius:99px;display:none}
+#count-badge.on{display:block}
 
-    :root {
-      --bg-primary:    #0a0a0f;
-      --bg-secondary:  #111118;
-      --bg-card:       #16161f;
-      --bg-hover:      #1e1e2a;
-      --bg-modal:      #0d0d14;
-      --border:        #2a2a3a;
-      --border-light:  #3a3a4e;
-      --text-primary:  #f0f0f8;
-      --text-secondary:#9090a8;
-      --text-muted:    #505068;
-      --accent:        #6c63ff;
-      --accent-light:  #8a83ff;
-      --accent-dark:   #5548e0;
-      --accent-glow:   rgba(108,99,255,0.25);
-      --success:       #22c55e;
-      --warning:       #f59e0b;
-      --error:         #ef4444;
-      --live-red:      #ff3b3b;
-      --sidebar-width: 340px;
-      --header-height: 58px;
-      --font-ui:       'Outfit', system-ui, sans-serif;
-      --font-mono:     'JetBrains Mono', 'Fira Code', monospace;
-      --radius-sm:     6px;
-      --radius-md:     10px;
-      --radius-lg:     16px;
-      --shadow-sm:     0 1px 3px rgba(0,0,0,0.4);
-      --shadow-md:     0 4px 16px rgba(0,0,0,0.5);
-      --shadow-lg:     0 8px 32px rgba(0,0,0,0.6);
-      --transition:    0.18s ease;
-    }
+/* ── Buttons ─────────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;
+  border:none;border-radius:var(--r);cursor:pointer;font-family:'Outfit',sans-serif;
+  font-size:13px;font-weight:500;white-space:nowrap;user-select:none;
+  transition:all var(--ease);-webkit-tap-highlight-color:transparent}
+.btn-p{background:var(--acc);color:#fff}
+.btn-p:hover{background:var(--acc2)}
+.btn-p:active{transform:scale(.97)}
+.btn-g{background:var(--bg3);color:var(--t2);border:1px solid var(--border)}
+.btn-g:hover{background:var(--bg4);color:var(--t1)}
+.btn-i{width:36px;height:36px;padding:0;justify-content:center;
+  background:var(--bg3);color:var(--t2);border:1px solid var(--border);border-radius:var(--r)}
+.btn-i:hover{background:var(--bg4);color:var(--t1)}
+.btn-i.on{background:var(--acc-g);color:var(--acc2);border-color:var(--acc)}
+.btn.ld{pointer-events:none;opacity:.6}
+.btn.ld .bt::after{content:'…'}
 
-    html { height: 100%; overflow: hidden; }
-    body {
-      font-family: var(--font-ui);
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      height: 100%;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      -webkit-font-smoothing: antialiased;
-    }
+/* ── Badges ──────────────────────────────────────────────────── */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;
+  border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+.b-live{background:var(--live);color:#fff}
+.b-live::before{content:'';width:5px;height:5px;border-radius:50%;background:#fff;
+  animation:pdot 1.8s ease-in-out infinite;flex-shrink:0}
+.b-vod{background:rgba(34,211,238,.15);color:var(--vod);border:1px solid rgba(34,211,238,.25)}
+.b-series{background:rgba(167,139,250,.15);color:var(--series);border:1px solid rgba(167,139,250,.25)}
+@keyframes pdot{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,.6)}50%{box-shadow:0 0 0 4px rgba(255,255,255,0)}}
 
-    /* ===== Scrollbars ===== */
-    ::-webkit-scrollbar { width: 4px; height: 4px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 99px; }
+/* ── Main scroll area ────────────────────────────────────────── */
+#page{flex:1;overflow-y:auto;overflow-x:hidden;padding-top:var(--nav);
+  -webkit-overflow-scrolling:touch}
 
-    /* ===== Header ===== */
-    #header {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      height: var(--header-height);
-      background: rgba(10,10,15,0.92);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 16px;
-      gap: 12px;
-      flex-shrink: 0;
-    }
-    .header-logo {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      text-decoration: none;
-    }
-    .header-logo-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      background: linear-gradient(135deg, var(--accent), #a78bfa);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-      flex-shrink: 0;
-    }
-    .header-logo-text {
-      font-size: 18px;
-      font-weight: 700;
-      background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-light) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      letter-spacing: -0.3px;
-    }
-    .header-right { display: flex; align-items: center; gap: 8px; }
-    .channel-count-badge {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      color: var(--text-secondary);
-      padding: 3px 8px;
-      border-radius: 99px;
-      display: none;
-    }
-    .channel-count-badge.visible { display: block; }
+/* ── Player section ──────────────────────────────────────────── */
+#player-section{display:none}
+#player-section.on{display:block}
+#player-wrap{position:relative;width:100%;background:#000;max-width:1400px;margin:0 auto}
+#player-wrap::before{content:'';display:block;padding-top:46%}
+@media(max-width:767px){#player-wrap::before{padding-top:56.25%}}
+#main-video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:none}
+#buf-overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.5);z-index:10}
+#buf-overlay.on{display:flex}
+.spinner{width:42px;height:42px;border:3px solid rgba(255,255,255,.15);
+  border-top-color:var(--acc2);border-radius:50%;animation:spin .75s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#err-overlay{position:absolute;inset:0;display:none;flex-direction:column;
+  align-items:center;justify-content:center;gap:10px;background:rgba(0,0,0,.85);z-index:11}
+#err-overlay.on{display:flex}
+.err-icon{font-size:34px;opacity:.55}
+.err-msg{color:var(--t2);font-size:13px;text-align:center;padding:0 24px}
+#empty-state{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:12px;background:#000;
+  color:var(--t3);text-align:center;padding:24px}
+#empty-state svg{opacity:.2}
+#empty-state h3{font-size:16px;font-weight:600;color:var(--t2)}
+#empty-state p{font-size:13px;max-width:260px;line-height:1.6}
 
-    /* ===== Buttons ===== */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 7px 14px;
-      border-radius: var(--radius-md);
-      border: none;
-      cursor: pointer;
-      font-family: var(--font-ui);
-      font-size: 13px;
-      font-weight: 500;
-      transition: all var(--transition);
-      white-space: nowrap;
-      user-select: none;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .btn-primary {
-      background: var(--accent);
-      color: #fff;
-    }
-    .btn-primary:hover { background: var(--accent-light); transform: translateY(-1px); box-shadow: 0 4px 12px var(--accent-glow); }
-    .btn-primary:active { transform: translateY(0); }
-    .btn-ghost {
-      background: var(--bg-card);
-      color: var(--text-secondary);
-      border: 1px solid var(--border);
-    }
-    .btn-ghost:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border-light); }
-    .btn-icon {
-      width: 36px;
-      height: 36px;
-      padding: 0;
-      justify-content: center;
-      background: var(--bg-card);
-      color: var(--text-secondary);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-    }
-    .btn-icon:hover { background: var(--bg-hover); color: var(--text-primary); }
-    .btn-icon.active { background: var(--accent-glow); color: var(--accent-light); border-color: var(--accent); }
+/* ── Player meta bar ─────────────────────────────────────────── */
+#player-meta{display:none;flex-wrap:wrap;align-items:flex-start;gap:16px;
+  padding:14px 20px 18px;background:linear-gradient(to bottom,#0c0c14,var(--bg));
+  max-width:1400px;margin:0 auto;width:100%}
+#player-meta.on{display:flex}
+#pm-left{flex:1;min-width:200px}
+.pm-badges{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+#pm-name{font-size:20px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#pm-sub{font-size:12px;color:var(--t2);margin-top:3px}
+#epg-box{flex-shrink:0;width:280px;background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--r2);padding:12px 14px;display:none}
+#epg-box.on{display:block}
+.epg-row{margin-bottom:10px}
+.epg-row:last-child{margin-bottom:0}
+.epg-lbl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  color:var(--t3);margin-bottom:3px}
+.epg-title{font-size:13px;font-weight:600;color:var(--t1);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.epg-time{font-size:11px;color:var(--t2);margin-top:2px}
+.epg-track{height:3px;background:rgba(255,255,255,.08);border-radius:99px;
+  margin-top:6px;overflow:hidden}
+.epg-fill{height:100%;background:var(--acc);border-radius:99px;transition:width 30s linear}
+.epg-hr{border:none;border-top:1px solid var(--border);margin:8px 0}
+.pm-actions{display:flex;gap:8px;align-items:flex-start;flex-shrink:0}
+@media(max-width:600px){#epg-box{width:100%}#pm-left{min-width:0;width:100%}}
 
-    /* ===== Main Layout ===== */
-    #app {
-      flex: 1;
-      display: flex;
-      overflow: hidden;
-      min-height: 0;
-    }
+/* ── Browse section ──────────────────────────────────────────── */
+#browse{padding-bottom:60px}
 
-    /* ===== Player Panel ===== */
-    #player-panel {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      min-width: 0;
-    }
+/* ── Welcome hero ────────────────────────────────────────────── */
+#welcome{height:280px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:14px;text-align:center;padding:32px 24px;
+  background:radial-gradient(ellipse at 50% 0%,rgba(108,99,255,.12) 0%,transparent 70%)}
+#welcome h2{font-size:34px;font-weight:800;letter-spacing:-.5px;
+  background:linear-gradient(135deg,#fff 0%,var(--acc2) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+#welcome p{font-size:14px;color:var(--t2);max-width:380px;line-height:1.6}
 
-    #video-container {
-      position: relative;
-      background: #000;
-      flex-shrink: 0;
-    }
-    #video-container::before {
-      content: '';
-      display: block;
-      padding-top: 56.25%; /* 16:9 */
-    }
-    #main-video {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-    }
+/* ── Channel Hero ────────────────────────────────────────────── */
+#hero{position:relative;height:400px;overflow:hidden;display:none}
+#hero.on{display:block}
+#hero-bg{position:absolute;inset:0;background-size:cover;background-position:center;
+  filter:blur(36px) brightness(.35) saturate(1.4);transform:scale(1.08)}
+#hero-grad{position:absolute;inset:0;
+  background:linear-gradient(to bottom,transparent 10%,rgba(10,10,15,.5) 55%,var(--bg) 100%)}
+#hero-body{position:relative;z-index:1;height:100%;display:flex;flex-direction:column;
+  justify-content:flex-end;padding:28px 40px;max-width:680px}
+#hero-badge{margin-bottom:10px}
+#hero-name{font-size:44px;font-weight:800;letter-spacing:-.8px;line-height:1.05;
+  text-shadow:0 2px 20px rgba(0,0,0,.5)}
+#hero-group{font-size:13px;color:rgba(255,255,255,.6);margin-top:5px}
+#hero-epg{font-size:14px;color:rgba(255,255,255,.75);margin-top:6px;font-style:italic}
+#hero-btns{display:flex;gap:10px;margin-top:18px}
+.hbtn-play{display:inline-flex;align-items:center;gap:7px;padding:11px 26px;
+  border:none;border-radius:var(--r);background:#fff;color:#000;
+  font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;
+  cursor:pointer;transition:all var(--ease)}
+.hbtn-play:hover{background:rgba(255,255,255,.87);transform:scale(1.02)}
+.hbtn-info{display:inline-flex;align-items:center;gap:7px;padding:11px 22px;
+  border:1px solid rgba(255,255,255,.28);border-radius:var(--r);
+  background:rgba(255,255,255,.1);color:#fff;font-family:'Outfit',sans-serif;
+  font-size:14px;font-weight:600;cursor:pointer;transition:all var(--ease)}
+.hbtn-info:hover{background:rgba(255,255,255,.18)}
+@media(max-width:600px){
+  #hero{height:300px}
+  #hero-body{padding:20px 20px}
+  #hero-name{font-size:28px}
+}
 
-    /* Buffering Spinner */
-    #buffering-overlay {
-      position: absolute;
-      inset: 0;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0,0,0,0.5);
-      z-index: 10;
-    }
-    #buffering-overlay.visible { display: flex; }
-    .spinner {
-      width: 44px;
-      height: 44px;
-      border: 3px solid rgba(255,255,255,0.15);
-      border-top-color: var(--accent-light);
-      border-radius: 50%;
-      animation: spin 0.75s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
+/* ── Carousels ───────────────────────────────────────────────── */
+.car-sec{margin-top:28px;padding:0 20px}
+.car-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.car-title{font-size:17px;font-weight:700}
+.car-track{display:flex;gap:12px;overflow-x:auto;overflow-y:visible;padding-bottom:14px;
+  scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+.car-track::-webkit-scrollbar{height:3px}
 
-    /* Empty State */
-    #empty-state {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      background: #000;
-      color: var(--text-muted);
-      text-align: center;
-      padding: 24px;
-    }
-    #empty-state svg { opacity: 0.3; }
-    #empty-state h3 { font-size: 16px; font-weight: 500; color: var(--text-secondary); }
-    #empty-state p { font-size: 13px; line-height: 1.5; max-width: 260px; }
+/* ── Channel Card ────────────────────────────────────────────── */
+.ch-card{flex-shrink:0;width:var(--card);cursor:pointer;border-radius:var(--r);
+  position:relative;scroll-snap-align:start;
+  will-change:transform;
+  transition:transform .22s cubic-bezier(.25,.46,.45,.94)}
+.ch-card:hover{transform:scale(1.06) translateY(-4px)}
+.ch-card.now .ch-thumb{box-shadow:0 0 0 2px var(--acc),0 6px 20px var(--acc-g)}
+.ch-thumb{width:100%;aspect-ratio:16/9;border-radius:var(--r);background:var(--bg3);
+  position:relative;overflow:hidden;transition:box-shadow .22s ease}
+.ch-img{width:100%;height:100%;object-fit:contain;padding:10px;
+  opacity:0;transition:opacity .3s ease}
+.ch-img.loaded{opacity:1}
+.ch-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:800;color:rgba(255,255,255,.9);letter-spacing:-.5px}
+.ch-overlay{position:absolute;inset:0;
+  background:linear-gradient(to top,rgba(0,0,0,.65) 0%,transparent 55%);
+  opacity:0;transition:opacity var(--ease);display:flex;align-items:flex-end;padding:8px}
+.ch-card:hover .ch-overlay{opacity:1}
+.ch-play{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.92);
+  display:flex;align-items:center;justify-content:center;color:#000;font-size:10px}
+.ch-badge{position:absolute;top:6px;left:6px;z-index:1}
+.ch-body{padding:7px 2px 0}
+.ch-name{font-size:12px;font-weight:600;color:var(--t1);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch-epg{font-size:11px;color:var(--t2);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch-epg.ep{color:var(--acc2)}
 
-    /* Error overlay */
-    #error-overlay {
-      position: absolute;
-      inset: 0;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      background: rgba(0,0,0,0.85);
-      z-index: 11;
-    }
-    #error-overlay.visible { display: flex; }
-    #error-overlay .err-icon { font-size: 36px; opacity: 0.6; }
-    #error-overlay .err-msg { color: var(--text-secondary); font-size: 14px; text-align: center; padding: 0 24px; }
-    #error-overlay .btn { margin-top: 4px; }
+/* ── Empty tab ───────────────────────────────────────────────── */
+.empty-tab{text-align:center;padding:72px 24px;color:var(--t2)}
+.empty-tab svg{opacity:.18;margin-bottom:14px}
+.empty-tab h3{font-size:17px;font-weight:600;margin-bottom:8px}
+.empty-tab p{font-size:13px;color:var(--t3);line-height:1.6}
 
-    /* Now Playing Bar */
-    #now-playing {
-      display: none;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 14px;
-      background: var(--bg-secondary);
-      border-top: 1px solid var(--border);
-      min-height: 52px;
-    }
-    #now-playing.visible { display: flex; }
-    .live-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--live-red);
-      flex-shrink: 0;
-      animation: pulse-dot 1.8s ease-in-out infinite;
-    }
-    @keyframes pulse-dot {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(255,59,59,0.6); }
-      50% { box-shadow: 0 0 0 5px rgba(255,59,59,0); }
-    }
-    .now-playing-info { flex: 1; min-width: 0; }
-    .now-playing-name {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-primary);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .now-playing-group {
-      font-size: 11px;
-      color: var(--text-muted);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .now-playing-actions { display: flex; gap: 6px; flex-shrink: 0; }
+/* ── Search overlay ──────────────────────────────────────────── */
+#search-ov{display:none;position:fixed;inset:0;z-index:300;
+  background:rgba(10,10,15,.96);flex-direction:column;
+  padding-top:calc(var(--nav) + 20px)}
+#search-ov.on{display:flex}
+#search-wrap{display:flex;align-items:center;gap:10px;padding:0 20px;
+  max-width:680px;margin:0 auto;width:100%}
+.s-field{position:relative;flex:1}
+.s-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);
+  color:var(--t3);pointer-events:none}
+#search-input{width:100%;height:46px;background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--r2);padding:0 14px 0 40px;color:var(--t1);
+  font-family:'Outfit',sans-serif;font-size:15px;outline:none;transition:border-color var(--ease)}
+#search-input:focus{border-color:var(--acc)}
+#s-cancel{background:none;border:none;color:var(--t2);font-family:'Outfit',sans-serif;
+  font-size:14px;cursor:pointer;padding:8px;white-space:nowrap}
+#s-cancel:hover{color:var(--t1)}
+#search-results{flex:1;overflow-y:auto;padding:16px 20px;max-width:680px;margin:0 auto;width:100%}
+.sr-item{display:flex;align-items:center;gap:12px;padding:9px 10px;
+  border-radius:var(--r);cursor:pointer;transition:background var(--ease)}
+.sr-item:hover{background:var(--bg3)}
+.sr-thumb{width:62px;height:35px;border-radius:5px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;overflow:hidden}
+.sr-thumb img{width:100%;height:100%;object-fit:contain;padding:3px}
+.sr-info{flex:1;min-width:0}
+.sr-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sr-meta{font-size:11px;color:var(--t2);margin-top:2px}
+#s-empty{text-align:center;color:var(--t2);padding:40px 0;display:none}
 
-    /* ===== Sidebar ===== */
-    #sidebar {
-      width: var(--sidebar-width);
-      flex-shrink: 0;
-      display: flex;
-      flex-direction: column;
-      border-left: 1px solid var(--border);
-      background: var(--bg-secondary);
-      overflow: hidden;
-    }
+/* ── Modal ───────────────────────────────────────────────────── */
+#modal-ov{display:none;position:fixed;inset:0;z-index:350;
+  background:rgba(0,0,0,.72);align-items:center;justify-content:center;padding:16px}
+#modal-ov.on{display:flex}
+#modal{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r3);
+  width:100%;max-width:540px;overflow:hidden;
+  will-change:transform;animation:min .2s ease}
+@keyframes min{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+.mdl-hdr{padding:18px 20px 14px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border)}
+.mdl-title{font-size:16px;font-weight:700}
+.mdl-x{width:28px;height:28px;border:none;background:var(--bg4);color:var(--t2);
+  border-radius:var(--r);cursor:pointer;font-size:16px;transition:all var(--ease)}
+.mdl-x:hover{background:var(--border2);color:var(--t1)}
+.mdl-body{padding:16px 20px 20px}
+.mdl-lbl{font-size:12px;font-weight:500;color:var(--t2);display:block;margin-bottom:6px}
+#plinput{width:100%;height:210px;background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--r);padding:11px;color:var(--t1);font-family:monospace;
+  font-size:12px;line-height:1.6;resize:vertical;outline:none;transition:border-color var(--ease)}
+#plinput:focus{border-color:var(--acc)}
+#plinput::placeholder{color:var(--t3)}
+.mdl-hint{font-size:11px;color:var(--t3);margin-top:6px;line-height:1.5}
+.mdl-hint code{color:var(--acc2)}
+.mdl-acts{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
 
-    .sidebar-header {
-      padding: 12px 14px 8px;
-      flex-shrink: 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .search-wrap {
-      position: relative;
-      margin-bottom: 10px;
-    }
-    .search-wrap svg {
-      position: absolute;
-      left: 10px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--text-muted);
-      pointer-events: none;
-    }
-    #search-input {
-      width: 100%;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      padding: 8px 10px 8px 34px;
-      color: var(--text-primary);
-      font-family: var(--font-ui);
-      font-size: 13px;
-      outline: none;
-      transition: border-color var(--transition);
-    }
-    #search-input:focus { border-color: var(--accent); }
-    #search-input::placeholder { color: var(--text-muted); }
+/* ── Mini player ─────────────────────────────────────────────── */
+#mini-player{display:none;position:fixed;bottom:18px;right:14px;width:176px;
+  border-radius:var(--r);overflow:hidden;border:1px solid var(--border);z-index:150;
+  cursor:pointer;will-change:transform;transition:transform .2s ease}
+#mini-player.on{display:block}
+#mini-player:hover{transform:scale(1.03)}
+#mini-vid{width:100%;aspect-ratio:16/9;object-fit:contain;background:#000;
+  display:block;pointer-events:none}
+.mini-lbl{background:rgba(0,0,0,.85);padding:5px 8px;font-size:10px;color:var(--t2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini-x{position:absolute;top:5px;right:5px;width:20px;height:20px;border-radius:50%;
+  background:rgba(0,0,0,.7);border:none;color:#fff;cursor:pointer;font-size:10px;
+  display:flex;align-items:center;justify-content:center}
 
-    /* Group filter tags */
-    #group-tags {
-      display: flex;
-      gap: 6px;
-      overflow-x: auto;
-      padding-bottom: 4px;
-      scrollbar-width: none;
-    }
-    #group-tags::-webkit-scrollbar { display: none; }
-    .group-tag {
-      flex-shrink: 0;
-      padding: 4px 10px;
-      border-radius: 99px;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--text-secondary);
-      font-family: var(--font-ui);
-      font-size: 11px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all var(--transition);
-      -webkit-tap-highlight-color: transparent;
-    }
-    .group-tag:hover { border-color: var(--accent); color: var(--accent-light); }
-    .group-tag.active {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #fff;
-    }
+/* ── Toast ───────────────────────────────────────────────────── */
+#toasts{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
+  z-index:400;display:flex;flex-direction:column;align-items:center;
+  gap:7px;pointer-events:none;will-change:transform}
+.toast{padding:9px 17px;border-radius:99px;font-size:13px;font-weight:500;
+  color:#fff;white-space:nowrap;animation:tin .22s ease}
+.toast.ok{background:#166534;border:1px solid var(--ok)}
+.toast.err{background:#7f1d1d;border:1px solid var(--err)}
+.toast.inf{background:#1e1a4f;border:1px solid var(--acc)}
+@keyframes tin{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+@keyframes tout{from{opacity:1}to{opacity:0;transform:translateY(-7px)}}
 
-    /* Channel list */
-    #channel-list {
-      flex: 1;
-      overflow-y: auto;
-      overflow-x: hidden;
-    }
+/* ── View dots (mobile) ──────────────────────────────────────── */
+#dots{display:none;justify-content:center;gap:6px;padding:6px 0;
+  background:var(--bg);border-top:1px solid var(--border);flex-shrink:0}
+.dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.2);
+  transition:all var(--ease)}
+.dot.on{background:var(--acc2);transform:scale(1.3)}
 
-    .section-label {
-      height: 28px;
-      box-sizing: border-box;
-      padding: 10px 14px 4px;
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: var(--text-muted);
-    }
+/* ── Mobile layout ───────────────────────────────────────────── */
+@media(max-width:767px){
+  :root{--card:148px}
+  #nav-tabs{display:none}
+  #nav{padding:0 12px}
+  .nav-logo-text{display:none}
+  #dots{display:flex}
+  .car-sec{padding:0 14px}
+  #hero-body{padding:20px}
+  #hero-name{font-size:28px}
+  #hero{height:300px}
+  #player-meta{padding:12px 14px}
+  #page{padding-bottom:0}
+}
+@media(min-width:768px){
+  #mini-player{display:none!important}
+  #dots{display:none!important}
+}
 
-    /* Channel Item */
-    .channel-item {
-      height: 59px;
-      box-sizing: border-box;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 14px;
-      cursor: pointer;
-      transition: background var(--transition);
-      border-bottom: 1px solid rgba(255,255,255,0.03);
-      position: relative;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .channel-item:hover { background: var(--bg-hover); }
-    .channel-item.active { background: rgba(108,99,255,0.1); }
-    .channel-item.active::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 3px;
-      background: var(--accent);
-      border-radius: 0 2px 2px 0;
-    }
-    .channel-item.dead {
-      opacity: 0.4;
-      pointer-events: none;
-    }
-    .channel-item.dead::after {
-      content: '✕';
-      position: absolute;
-      right: 44px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 10px;
-      color: var(--error);
-    }
+/* ── Mobile swipe layout ─────────────────────────────────────── */
+#swipe-wrap{flex:1;display:flex;overflow:hidden;min-height:0}
+#player-panel{min-width:100%;transition:transform .3s cubic-bezier(.25,.46,.45,.94);
+  will-change:transform;display:flex;flex-direction:column;overflow:hidden}
+#sidebar-panel{min-width:100%;transition:transform .3s cubic-bezier(.25,.46,.45,.94);
+  will-change:transform;display:flex;flex-direction:column;overflow:hidden;
+  background:var(--bg2);border-left:1px solid var(--border)}
+@media(max-width:767px){
+  body.chview #player-panel{transform:translateX(-100%)}
+  body.chview #sidebar-panel{transform:translateX(-100%)}
+}
+@media(min-width:768px){
+  #swipe-wrap{display:block;overflow:hidden}
+  #player-panel,#sidebar-panel{min-width:unset;transform:none!important;transition:none}
+}
 
-    /* Channel Logo */
-    .channel-logo-wrap {
-      width: 42px;
-      height: 42px;
-      border-radius: var(--radius-sm);
-      overflow: hidden;
-      flex-shrink: 0;
-      position: relative;
-    }
-    .channel-logo-img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      background: var(--bg-card);
-    }
-    .channel-logo-fallback {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      font-weight: 700;
-      color: rgba(255,255,255,0.9);
-      letter-spacing: -0.5px;
-      user-select: none;
-    }
-
-    /* Channel Info */
-    .channel-info { flex: 1; min-width: 0; }
-    .channel-name {
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-primary);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      line-height: 1.4;
-    }
-    .channel-item.active .channel-name { color: var(--accent-light); }
-    .channel-group {
-      font-size: 11px;
-      color: var(--text-muted);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    /* Favorite button */
-    .fav-btn {
-      width: 28px;
-      height: 28px;
-      border: none;
-      background: none;
-      cursor: pointer;
-      color: var(--text-muted);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      transition: all var(--transition);
-      flex-shrink: 0;
-      font-size: 14px;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .fav-btn:hover { color: #f59e0b; background: rgba(245,158,11,0.1); }
-    .fav-btn.active { color: #f59e0b; }
-
-    /* Sidebar empty state */
-    #sidebar-empty {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      color: var(--text-muted);
-      padding: 32px 20px;
-      text-align: center;
-      font-size: 13px;
-    }
-    #sidebar-empty svg { opacity: 0.25; margin-bottom: 4px; }
-
-    /* ===== Modal ===== */
-    #modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.75);
-      z-index: 200;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-    }
-    #modal-overlay.open { display: flex; }
-    #modal {
-      background: var(--bg-modal);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      width: 100%;
-      max-width: 560px;
-      box-shadow: var(--shadow-lg);
-      overflow: hidden;
-      animation: modal-in 0.2s ease;
-    }
-    @keyframes modal-in {
-      from { opacity: 0; transform: translateY(12px) scale(0.98); }
-      to   { opacity: 1; transform: translateY(0) scale(1); }
-    }
-    .modal-header {
-      padding: 18px 20px 14px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid var(--border);
-    }
-    .modal-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-    .modal-close {
-      width: 30px;
-      height: 30px;
-      border-radius: var(--radius-sm);
-      border: none;
-      background: var(--bg-hover);
-      color: var(--text-secondary);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      transition: all var(--transition);
-    }
-    .modal-close:hover { background: var(--border); color: var(--text-primary); }
-    .modal-body { padding: 16px 20px 20px; }
-    .modal-label {
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--text-secondary);
-      margin-bottom: 6px;
-      display: block;
-    }
-    #playlist-input {
-      width: 100%;
-      height: 220px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      padding: 12px;
-      color: var(--text-primary);
-      font-family: var(--font-mono);
-      font-size: 12px;
-      line-height: 1.6;
-      resize: vertical;
-      outline: none;
-      transition: border-color var(--transition);
-    }
-    #playlist-input:focus { border-color: var(--accent); }
-    #playlist-input::placeholder { color: var(--text-muted); }
-    .modal-hint {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-top: 6px;
-      line-height: 1.5;
-    }
-    .modal-actions {
-      display: flex;
-      gap: 8px;
-      justify-content: flex-end;
-      margin-top: 14px;
-    }
-
-    /* ===== Toast ===== */
-    #toast-container {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 300;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      pointer-events: none;
-    }
-    .toast {
-      padding: 10px 18px;
-      border-radius: 99px;
-      font-size: 13px;
-      font-weight: 500;
-      color: #fff;
-      box-shadow: var(--shadow-md);
-      animation: toast-in 0.25s ease;
-      white-space: nowrap;
-    }
-    .toast.success { background: #166534; border: 1px solid var(--success); }
-    .toast.error   { background: #7f1d1d; border: 1px solid var(--error); }
-    .toast.info    { background: #1e1a4f; border: 1px solid var(--accent); }
-    @keyframes toast-in {
-      from { opacity: 0; transform: translateY(8px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes toast-out {
-      from { opacity: 1; transform: translateY(0); }
-      to   { opacity: 0; transform: translateY(-8px); }
-    }
-
-    /* ===== Mini Player ===== */
-    #mini-player {
-      display: none;
-      position: fixed;
-      bottom: 20px;
-      right: 16px;
-      width: 180px;
-      border-radius: var(--radius-md);
-      overflow: hidden;
-      box-shadow: var(--shadow-lg);
-      border: 1px solid var(--border);
-      z-index: 150;
-      cursor: pointer;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    #mini-player:hover { transform: scale(1.03); box-shadow: 0 12px 40px rgba(0,0,0,0.7); }
-    #mini-player.active { display: block; }
-    #mini-video-thumb {
-      width: 100%;
-      aspect-ratio: 16/9;
-      object-fit: contain;
-      background: #000;
-      display: block;
-      pointer-events: none;
-    }
-    .mini-label {
-      background: rgba(0,0,0,0.85);
-      padding: 5px 8px;
-      font-size: 10px;
-      color: var(--text-secondary);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .mini-close {
-      position: absolute;
-      top: 5px;
-      right: 5px;
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: rgba(0,0,0,0.7);
-      border: none;
-      color: #fff;
-      cursor: pointer;
-      font-size: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    /* ===== View Dot Indicator (mobile) ===== */
-    #view-dots {
-      display: none;
-      justify-content: center;
-      gap: 6px;
-      padding: 6px 0;
-      background: var(--bg-primary);
-      border-top: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    .view-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--border-light);
-      transition: background var(--transition), transform var(--transition);
-    }
-    .view-dot.active {
-      background: var(--accent-light);
-      transform: scale(1.3);
-    }
-
-    /* ===== Mobile Layout ===== */
-    @media (max-width: 767px) {
-      #app {
-        flex-direction: column;
-        overflow: hidden;
-        touch-action: pan-y;
-      }
-      #sidebar {
-        width: 100%;
-        border-left: none;
-        border-top: 1px solid var(--border);
-        max-height: 50vh;
-      }
-      #view-dots { display: flex; }
-
-      /* Swipe views */
-      #swipe-container {
-        flex: 1;
-        display: flex;
-        overflow: hidden;
-        min-height: 0;
-      }
-      #player-panel {
-        min-width: 100%;
-        transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-      }
-      #sidebar {
-        min-width: 100%;
-        max-height: none;
-        transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-      }
-      /* when channel-view is active, both panels slide left */
-      body.channel-view #player-panel { transform: translateX(-100%); }
-      body.channel-view #sidebar { transform: translateX(-100%); }
-    }
-
-    @media (min-width: 768px) {
-      #swipe-container {
-        flex: 1;
-        display: flex;
-        overflow: hidden;
-        min-height: 0;
-      }
-      #view-dots { display: none !important; }
-      .mini-player { display: none !important; }
-    }
-
-    /* ===== Loading state for load button ===== */
-    .btn.loading {
-      pointer-events: none;
-      opacity: 0.7;
-    }
-    .btn.loading .btn-text::after {
-      content: '...';
-    }
-
-    /* ===== No results ===== */
-    #no-results {
-      padding: 32px 20px;
-      text-align: center;
-      color: var(--text-muted);
-      font-size: 13px;
-      display: none;
-    }
-    #no-results.visible { display: block; }
-  </style>
+/* ── Desktop: player + sidebar side by side ──────────────────── */
+@media(min-width:768px){
+  #app{flex:1;display:flex;overflow:hidden;min-height:0}
+  #player-panel{flex:1;overflow:hidden;display:flex;flex-direction:column}
+  #sidebar-panel{width:320px;flex-shrink:0;display:flex;flex-direction:column;
+    overflow:hidden;border-left:1px solid var(--border);background:var(--bg2)}
+  #page{display:flex;flex-direction:column;height:100%;overflow:hidden;padding-top:0}
+  #player-section{flex-shrink:0}
+  #browse{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+  /* sidebar channel list */
+  #sidebar-panel .sbhdr{padding:10px 12px 8px;border-bottom:1px solid var(--border);flex-shrink:0}
+  #sidebar-panel .s-wrap{position:relative;margin-bottom:8px}
+  #sidebar-panel .s-wrap svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--t3);pointer-events:none}
+  #sb-search{width:100%;background:var(--bg3);border:1px solid var(--border);
+    border-radius:var(--r);padding:7px 9px 7px 32px;color:var(--t1);
+    font-family:'Outfit',sans-serif;font-size:13px;outline:none}
+  #sb-search:focus{border-color:var(--acc)}
+  #sb-search::placeholder{color:var(--t3)}
+  #group-tags{display:flex;gap:5px;overflow-x:auto;padding-bottom:3px;scrollbar-width:none}
+  #group-tags::-webkit-scrollbar{display:none}
+  .gtag{flex-shrink:0;padding:3px 10px;border-radius:99px;border:1px solid var(--border);
+    background:transparent;color:var(--t2);font-family:'Outfit',sans-serif;
+    font-size:11px;font-weight:500;cursor:pointer;transition:all var(--ease);
+    -webkit-tap-highlight-color:transparent}
+  .gtag:hover{border-color:var(--acc);color:var(--acc2)}
+  .gtag.on{background:var(--acc);border-color:var(--acc);color:#fff}
+  #sb-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:8px;color:var(--t3);padding:32px 20px;text-align:center;font-size:13px}
+  #sb-empty svg{opacity:.2;margin-bottom:4px}
+  /* virtual scroll channel list */
+  #chan-list{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+    contain:layout style paint}
+  #no-results{padding:28px 18px;text-align:center;color:var(--t3);font-size:13px;display:none}
+  #no-results.on{display:block}
+  .sec-lbl{height:28px;box-sizing:border-box;padding:10px 14px 4px;
+    font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--t3)}
+  .ch-item{height:59px;box-sizing:border-box;display:flex;align-items:center;gap:10px;
+    padding:8px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);
+    position:relative;-webkit-tap-highlight-color:transparent;transition:background var(--ease)}
+  .ch-item:hover{background:var(--bg4)}
+  .ch-item.now{background:rgba(108,99,255,.09)}
+  .ch-item.now::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+    background:var(--acc);border-radius:0 2px 2px 0}
+  .ch-item.dead{opacity:.38;pointer-events:none}
+  .ch-item.dead::after{content:'✕';position:absolute;right:42px;top:50%;
+    transform:translateY(-50%);font-size:10px;color:var(--err)}
+  .ch-logo{width:42px;height:42px;border-radius:5px;overflow:hidden;flex-shrink:0;position:relative}
+  .ch-logo img{width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .3s}
+  .ch-logo img.loaded{opacity:1}
+  .ch-logo-fb{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:700;color:rgba(255,255,255,.9)}
+  .ch-info{flex:1;min-width:0}
+  .ch-n{font-size:13px;font-weight:500;color:var(--t1);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
+  .ch-item.now .ch-n{color:var(--acc2)}
+  .ch-g{font-size:11px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ch-g.ep{color:var(--acc2)}
+  .fav-btn{width:28px;height:28px;border:none;background:none;cursor:pointer;
+    color:var(--t3);display:flex;align-items:center;justify-content:center;
+    border-radius:50%;font-size:14px;transition:all var(--ease);flex-shrink:0;
+    -webkit-tap-highlight-color:transparent}
+  .fav-btn:hover{color:var(--warn);background:rgba(245,158,11,.1)}
+  .fav-btn.on{color:var(--warn)}
+}
+/* mobile: hide sidebar panel; browse handles everything */
+@media(max-width:767px){
+  #sidebar-panel{display:none}
+}
+</style>
 </head>
 <body>
+<!-- NAV -->
+<nav id="nav">
+  <div class="nav-logo"><div class="nav-logo-icon">▶</div><span class="nav-logo-text">Streamview</span></div>
+  <div id="nav-tabs">
+    <button class="ntab active" data-tab="home">Home</button>
+    <button class="ntab" data-tab="live">Live TV</button>
+    <button class="ntab" data-tab="movies">Movies</button>
+    <button class="ntab" data-tab="series">Series</button>
+    <button class="ntab" data-tab="fav">Favourites</button>
+  </div>
+  <div class="nav-right">
+    <span id="count-badge"></span>
+    <button class="btn-i" id="search-btn" title="Search">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </button>
+    <button class="btn btn-p" id="load-btn">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span class="bt">Load Playlist</span>
+    </button>
+  </div>
+</nav>
 
-  <!-- ===== Header ===== -->
-  <header id="header">
-    <div class="header-logo">
-      <div class="header-logo-icon">▶</div>
-      <span class="header-logo-text">Streamview</span>
-    </div>
-    <div class="header-right">
-      <span class="channel-count-badge" id="channel-count-badge"></span>
-      <button class="btn btn-primary" id="load-btn">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        Load Playlist
-      </button>
-    </div>
-  </header>
-
-  <!-- ===== Main App ===== -->
-  <div id="app">
-    <div id="swipe-container">
-
-      <!-- ===== Player Panel ===== -->
-      <div id="player-panel">
-        <div id="video-container">
-          <!-- Empty state -->
+<!-- APP -->
+<div id="app">
+  <!-- DESKTOP: player panel + sidebar panel -->
+  <div id="player-panel">
+    <div id="page">
+      <!-- Player section -->
+      <div id="player-section">
+        <div id="player-wrap">
           <div id="empty-state">
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2" y="3" width="20" height="14" rx="2"/><path d="m8 21 4-4 4 4"/><path d="M12 17v4"/>
-            </svg>
-            <h3>No playlist loaded</h3>
-            <p>Paste an M3U playlist or a URL to a .m3u file to get started.</p>
-            <button class="btn btn-primary" onclick="document.getElementById('modal-overlay').classList.add('open');document.getElementById('playlist-input').focus()">
-              Load Playlist
-            </button>
+            <svg width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="m8 21 4-4 4 4"/><path d="M12 17v4"/></svg>
+            <h3>Nothing playing</h3>
+            <p>Pick a channel from the list or load a playlist to get started.</p>
           </div>
-          <!-- Video element -->
-          <video
-            id="main-video"
-            playsinline
-            controls
-            style="display:none;"
-          ></video>
-          <!-- Buffering overlay -->
-          <div id="buffering-overlay">
-            <div class="spinner"></div>
-          </div>
-          <!-- Error overlay -->
-          <div id="error-overlay">
+          <video id="main-video" playsinline controls></video>
+          <div id="buf-overlay"><div class="spinner"></div></div>
+          <div id="err-overlay">
             <div class="err-icon">⚠</div>
-            <p class="err-msg" id="error-msg">Stream unavailable</p>
-            <button class="btn btn-ghost" id="retry-btn">Retry</button>
+            <p class="err-msg" id="err-msg">Stream unavailable</p>
+            <button class="btn btn-g" id="retry-btn">Retry</button>
           </div>
         </div>
-
-        <!-- Now Playing Bar -->
-        <div id="now-playing">
-          <span class="live-dot"></span>
-          <div class="now-playing-info">
-            <div class="now-playing-name" id="np-name">—</div>
-            <div class="now-playing-group" id="np-group">—</div>
+        <div id="player-meta">
+          <div id="pm-left">
+            <div class="pm-badges"><span id="pm-badge"></span></div>
+            <div id="pm-name">—</div>
+            <div id="pm-sub">—</div>
           </div>
-          <div class="now-playing-actions">
-            <button class="btn btn-icon" id="pip-btn" title="Picture-in-Picture">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><rect x="12" y="10" width="8" height="5" rx="1"/></svg>
+          <div id="epg-box">
+            <div class="epg-row">
+              <div class="epg-lbl">Now Playing</div>
+              <div class="epg-title" id="epg-now">—</div>
+              <div class="epg-time" id="epg-now-t"></div>
+              <div class="epg-track"><div class="epg-fill" id="epg-fill" style="width:0%"></div></div>
+            </div>
+            <hr class="epg-hr">
+            <div class="epg-row">
+              <div class="epg-lbl">Up Next</div>
+              <div class="epg-title" id="epg-next">—</div>
+              <div class="epg-time" id="epg-next-t"></div>
+            </div>
+          </div>
+          <div class="pm-actions">
+            <button class="btn-i" id="pip-btn" title="Picture-in-Picture">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><rect x="12" y="10" width="8" height="5" rx="1"/></svg>
+            </button>
+            <button class="btn-i" id="fav-player-btn" title="Favourite">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             </button>
           </div>
         </div>
-      </div><!-- /player-panel -->
-
-      <!-- ===== Sidebar ===== -->
-      <div id="sidebar">
-        <div class="sidebar-header">
-          <div class="search-wrap">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="search" id="search-input" placeholder="Search channels…" autocomplete="off" />
-          </div>
-          <div id="group-tags"></div>
-        </div>
-
-        <!-- Empty sidebar state -->
-        <div id="sidebar-empty">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 6h16M4 12h16M4 18h7"/>
-          </svg>
-          <span>Load a playlist to see channels</span>
-        </div>
-
-        <div id="channel-list" style="display:none;"></div>
-        <div id="no-results">No channels match your search</div>
-      </div><!-- /sidebar -->
-
-    </div><!-- /swipe-container -->
-  </div><!-- /app -->
-
-  <!-- ===== View Dots (mobile) ===== -->
-  <div id="view-dots">
-    <div class="view-dot active" id="dot-player"></div>
-    <div class="view-dot" id="dot-channels"></div>
-  </div>
-
-  <!-- ===== Mini Player ===== -->
-  <div id="mini-player">
-    <video id="mini-video-thumb" playsinline muted></video>
-    <div class="mini-label" id="mini-label">Now Playing</div>
-    <button class="mini-close" id="mini-close-btn">✕</button>
-  </div>
-
-  <!-- ===== Load Playlist Modal ===== -->
-  <div id="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-    <div id="modal">
-      <div class="modal-header">
-        <h2 class="modal-title" id="modal-title">Load Playlist</h2>
-        <button class="modal-close" id="modal-close-btn" aria-label="Close">✕</button>
       </div>
-      <div class="modal-body">
-        <label class="modal-label" for="playlist-input">Paste M3U content or a playlist URL (.m3u / .m3u8)</label>
-        <textarea id="playlist-input" spellcheck="false"
-          placeholder="#EXTM3U&#10;#EXTINF:-1 group-title=&quot;News&quot; tvg-logo=&quot;https://...&quot;,Channel Name&#10;https://stream.example.com/live.m3u8&#10;&#10;— or paste a URL like https://example.com/playlist.m3u"
-        ></textarea>
-        <p class="modal-hint">
-          Supports standard M3U/M3U8 format with <code>#EXTINF</code> entries. Duplicate channels (same name + URL) are merged automatically.
-        </p>
-        <div class="modal-actions">
-          <button class="btn btn-ghost" id="modal-cancel-btn">Cancel</button>
-          <button class="btn btn-primary" id="modal-load-btn">
-            <span class="btn-text">Load</span>
+
+      <!-- Browse section -->
+      <div id="browse">
+        <div id="welcome">
+          <div style="font-size:54px;opacity:.3">▶</div>
+          <h2>Your Streaming Hub</h2>
+          <p>Load an M3U playlist to start watching live TV, movies and series.</p>
+          <button class="btn btn-p" id="welcome-btn" style="margin-top:4px">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Load Playlist
           </button>
         </div>
+        <div id="hero">
+          <div id="hero-bg"></div>
+          <div id="hero-grad"></div>
+          <div id="hero-body">
+            <div id="hero-badge"></div>
+            <div id="hero-name"></div>
+            <div id="hero-group"></div>
+            <div id="hero-epg"></div>
+            <div id="hero-btns">
+              <button class="hbtn-play" id="hero-play">
+                <svg width="13" height="13" fill="currentColor" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21"/></svg>
+                Watch Now
+              </button>
+              <button class="hbtn-info" id="hero-info">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                More Info
+              </button>
+            </div>
+          </div>
+        </div>
+        <div id="content-area"></div>
+      </div>
+    </div><!-- /page -->
+  </div><!-- /player-panel -->
+
+  <!-- DESKTOP SIDEBAR -->
+  <div id="sidebar-panel">
+    <div class="sbhdr">
+      <div class="s-wrap">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="search" id="sb-search" placeholder="Search channels…" autocomplete="off"/>
+      </div>
+      <div id="group-tags"></div>
+    </div>
+    <div id="sb-empty">
+      <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h7"/></svg>
+      <span>Load a playlist to see channels</span>
+    </div>
+    <div id="chan-list" style="display:none"></div>
+    <div id="no-results">No channels match</div>
+  </div>
+</div><!-- /app -->
+
+<!-- VIEW DOTS (mobile) -->
+<div id="dots">
+  <div class="dot on" id="dot-p"></div>
+  <div class="dot" id="dot-c"></div>
+</div>
+
+<!-- MINI PLAYER -->
+<div id="mini-player">
+  <video id="mini-vid" playsinline muted></video>
+  <div class="mini-lbl" id="mini-lbl">Now Playing</div>
+  <button class="mini-x" id="mini-x">✕</button>
+</div>
+
+<!-- SEARCH OVERLAY -->
+<div id="search-ov">
+  <div id="search-wrap">
+    <div class="s-field">
+      <svg class="s-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="search" id="search-input" placeholder="Search channels, movies, series…" autocomplete="off"/>
+    </div>
+    <button id="s-cancel">Cancel</button>
+  </div>
+  <div id="search-results"><div id="s-empty">No results</div></div>
+</div>
+
+<!-- MODAL -->
+<div id="modal-ov" role="dialog" aria-modal="true">
+  <div id="modal">
+    <div class="mdl-hdr">
+      <span class="mdl-title">Load Playlist</span>
+      <button class="mdl-x" id="mdl-x">✕</button>
+    </div>
+    <div class="mdl-body">
+      <label class="mdl-lbl" for="plinput">Paste M3U content or enter a playlist URL</label>
+      <textarea id="plinput" spellcheck="false" placeholder="#EXTM3U&#10;#EXTINF:-1 group-title=&quot;News&quot; tvg-logo=&quot;https://…&quot;,Channel Name&#10;https://stream.example.com/live.m3u8&#10;&#10;— or a URL: https://example.com/playlist.m3u"></textarea>
+      <p class="mdl-hint">Supports M3U/M3U8 with <code>#EXTINF</code> entries. EPG loaded automatically from <code>url-tvg</code> if present.</p>
+      <div class="mdl-acts">
+        <button class="btn btn-g" id="mdl-cancel">Cancel</button>
+        <button class="btn btn-p" id="mdl-load"><span class="bt">Load</span></button>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- ===== Toast Container ===== -->
-  <div id="toast-container" aria-live="polite"></div>
+<!-- TOASTS -->
+<div id="toasts" aria-live="polite"></div>
+<script>
+'use strict';
 
-  <script>
-  /* ================================================================
-     STREAMVIEW — IPTV M3U Player
-     Single-file, no build step, mobile-first
-  ================================================================ */
+/* ================================================================
+   STREAMVIEW  —  Netflix-style IPTV Player
+   Single-file · Mobile-first · Performance-optimised for Safari iOS
+================================================================ */
 
-  'use strict';
+// ── State ──────────────────────────────────────────────────────
+const S = {
+  channels:      [],
+  currentCh:     null,
+  tab:           'home',
+  group:         'All',
+  query:         '',
+  favorites:     new Set(),
+  recents:       [],          // channelId strings, newest first
+  deadIds:       new Set(),
+  volMap:        {},
+  hlsInst:       null,        // single reused HLS instance
+  retryCount:    0,
+  retryTimer:    null,
+  epg:           null,        // Map<tvgId, [{s,e,title,desc}]>  s/e = ms timestamps
+  epgUrl:        null,
+  epgTimer:      null,
+  heroCh:        null,
+  // virtual scroll (sidebar)
+  vRows:         null,
+  vOffsets:      null,
+  vTotalH:       0,
+  vLastStart:    -1,
+  vLastEnd:      -1,
+  // filter cache
+  filteredCache: null,
+  filterKey:     '',          // "group|query" key for cache invalidation
+  // observers / cleanup
+  logoObserver:  null,
+  miniObserver:  null,
+  isMini:        false,
+  isChView:      false,
+};
 
-  // ===== State =====
-  const state = {
-    channels: [],          // all parsed channels
-    filtered: [],          // currently displayed channels
-    currentChannel: null,  // currently playing channel
-    currentGroup: 'All',   // active group filter
-    searchQuery: '',       // current search string
-    favorites: new Set(),  // channel IDs marked as favorite
-    recentIds: [],         // array of channel IDs (most recent first, max 10)
-    deadIds: new Set(),    // channel IDs that failed after retries
-    volumeMap: {},         // channelId -> volume (0-1)
-    hlsInstance: null,     // current hls.js instance
-    retryCount: 0,
-    retryTimer: null,
-    isMiniPlayer: false,
-    isChannelView: false,  // mobile: are we showing channel list?
-    vRows: null,           // flat row array for virtual scroll
-    vOffsets: null,        // cumulative pixel offsets (Int32Array, length = vRows+1)
-    vTotalH: 0,            // total scrollable height in px
+// Persist
+try { const f=localStorage.getItem('sv_fav'); if(f) S.favorites=new Set(JSON.parse(f)); } catch(_){}
+try { const r=localStorage.getItem('sv_rec'); if(r) S.recents=JSON.parse(r); } catch(_){}
+
+// ── DOM refs ───────────────────────────────────────────────────
+const $=id=>document.getElementById(id);
+const video        = $('main-video');
+const bufOv        = $('buf-overlay');
+const errOv        = $('err-overlay');
+const errMsg       = $('err-msg');
+const emptyState   = $('empty-state');
+const playerSec    = $('player-section');
+const playerMeta   = $('player-meta');
+const pmName       = $('pm-name');
+const pmSub        = $('pm-sub');
+const pmBadge      = $('pm-badge');
+const epgBox       = $('epg-box');
+const epgNow       = $('epg-now');
+const epgNowT      = $('epg-now-t');
+const epgFill      = $('epg-fill');
+const epgNext      = $('epg-next');
+const epgNextT     = $('epg-next-t');
+const contentArea  = $('content-area');
+const heroBg       = $('hero-bg');
+const heroEl       = $('hero');
+const heroName     = $('hero-name');
+const heroGroup    = $('hero-group');
+const heroEpg      = $('hero-epg');
+const heroBadge    = $('hero-badge');
+const welcomeEl    = $('welcome');
+const modalOv      = $('modal-ov');
+const plinput      = $('plinput');
+const countBadge   = $('count-badge');
+const chanList     = $('chan-list');
+const groupTags    = $('group-tags');
+const sbEmpty      = $('sb-empty');
+const noResults    = $('no-results');
+const sbSearch     = $('sb-search');
+const miniPlayer   = $('mini-player');
+const miniVid      = $('mini-vid');
+const miniLbl      = $('mini-lbl');
+const dotP         = $('dot-p');
+const dotC         = $('dot-c');
+const browseEl     = $('browse');
+
+// ── Helpers ────────────────────────────────────────────────────
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function chId(ch){ return ch.name+'||'+ch.url; }
+
+function nameHash(s){
+  let h=5381;
+  for(let i=0;i<s.length;i++) h=((h<<5)+h)^s.charCodeAt(i);
+  return h>>>0;
+}
+function gradient(name){
+  const h=nameHash(name);
+  const h1=h%360, h2=(h1+40+(h>>8)%80)%360;
+  const sat=55+(h>>16)%25, l1=36+(h>>4)%18, l2=26+(h>>12)%18;
+  return `linear-gradient(135deg,hsl(${h1},${sat}%,${l1}%) 0%,hsl(${h2},${sat}%,${l2}%) 100%)`;
+}
+function initials(name){
+  const w=name.trim().split(/\s+/).filter(Boolean);
+  return w.length===1 ? w[0].slice(0,2).toUpperCase() : (w[0][0]+w[w.length-1][0]).toUpperCase();
+}
+function fmtTime(ms){
+  if(!ms) return '';
+  const d=new Date(ms);
+  return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+}
+
+// ── Toast ──────────────────────────────────────────────────────
+function toast(msg, type='inf', dur=2500){
+  const el=document.createElement('div');
+  el.className='toast '+type;
+  el.textContent=msg;
+  $('toasts').appendChild(el);
+  setTimeout(()=>{
+    el.style.animation='tout .22s ease forwards';
+    setTimeout(()=>el.remove(),230);
+  },dur);
+}
+
+// ── Content type ───────────────────────────────────────────────
+function detectType(ch){
+  const g=(ch.group||'').toLowerCase(), n=(ch.name||'').toLowerCase(), u=(ch.url||'').toLowerCase();
+  if(/\b(movie|movies|film|films|cinema|vod)\b/.test(g+' '+n)) return 'movie';
+  if(/\b(series|season|episode|tv.?show|soap|sitcom)\b/.test(g+' '+n)||/s\d{1,2}e\d{1,2}/i.test(n)) return 'series';
+  if(/\.(mp4|mkv|avi|mov|wmv|divx|f4v)(\?|$)/.test(u)) return 'movie';
+  return 'live';
+}
+function badgeHtml(type){
+  if(type==='movie')  return '<span class="badge b-vod">Movie</span>';
+  if(type==='series') return '<span class="badge b-series">Series</span>';
+  return '<span class="badge b-live">Live</span>';
+}
+
+// ── M3U Parser ─────────────────────────────────────────────────
+function parseM3U(text){
+  const channels=[], seen=new Set();
+  const lines=text.split(/\r?\n/);
+  let cur=null, epgUrl=null;
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i].trim();
+    if(!line) continue;
+    if(line.startsWith('#EXTM3U')){
+      const m=line.match(/(?:url-tvg|x-tvg-url)="([^"]+)"/i);
+      if(m) epgUrl=m[1];
+      continue;
+    }
+    if(line.startsWith('#EXTINF:')){
+      cur={name:'',group:'Uncategorized',logo:'',tvgId:'',url:''};
+      const a=line.slice(8);
+      const nm=a.match(/,(.+)$/); if(nm) cur.name=nm[1].trim();
+      const ex=k=>{ const m=a.match(new RegExp(k+'="([^"]*)"','i')); return m?m[1].trim():''; };
+      cur.group=ex('group-title')||'Uncategorized';
+      cur.logo=ex('tvg-logo');
+      cur.tvgId=ex('tvg-id');
+    } else if(cur&&!line.startsWith('#')&&/^https?:\/\//i.test(line)){
+      cur.url=line;
+      if(cur.name&&cur.url){ const k=chId(cur); if(!seen.has(k)){seen.add(k);channels.push({...cur});} }
+      cur=null;
+    } else if(!line.startsWith('#')&&!cur&&/^https?:\/\//i.test(line)){
+      const nm=decodeURIComponent(line.split('/').pop().split('?')[0])||line;
+      const k=nm+'||'+line;
+      if(!seen.has(k)){seen.add(k);channels.push({name:nm,group:'Uncategorized',logo:'',tvgId:'',url:line});}
+    }
+  }
+  return {channels,epgUrl};
+}
+
+// ── EPG ────────────────────────────────────────────────────────
+function parseXMLTVDate(s){
+  if(!s) return 0;
+  const m=s.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s*([+-])(\d{2})(\d{2})/);
+  if(!m) return 0;
+  const [,y,mo,d,h,mi,se,sign,tzh,tzm]=m;
+  const utc=Date.UTC(+y,+mo-1,+d,+h,+mi,+se);
+  const off=(sign==='+'?-1:1)*(+tzh*60+(+tzm))*60000;
+  return utc+off;
+}
+function parseXMLTV(xml){
+  let doc;
+  try{ doc=new DOMParser().parseFromString(xml,'text/xml'); } catch(_){ return null; }
+  if(doc.querySelector('parsererror')) return null;
+  const map=new Map();
+  doc.querySelectorAll('programme').forEach(p=>{
+    const cid=p.getAttribute('channel');
+    const s=parseXMLTVDate(p.getAttribute('start'));
+    const e=parseXMLTVDate(p.getAttribute('stop'));
+    const title=(p.querySelector('title')||{}).textContent||'';
+    const desc=(p.querySelector('desc')||{}).textContent||'';
+    if(!cid||!title) return;
+    if(!map.has(cid)) map.set(cid,[]);
+    map.get(cid).push({s,e,title,desc});
+  });
+  return map;
+}
+function nowProg(tvgId){
+  if(!S.epg||!tvgId) return null;
+  const ps=S.epg.get(tvgId); if(!ps) return null;
+  const now=Date.now();
+  return ps.find(p=>p.s<=now&&p.e>now)||null;
+}
+function nextProg(tvgId){
+  if(!S.epg||!tvgId) return null;
+  const ps=S.epg.get(tvgId); if(!ps) return null;
+  const now=Date.now();
+  const up=ps.filter(p=>p.s>now).sort((a,b)=>a.s-b.s);
+  return up[0]||null;
+}
+function updateEPGDisplay(){
+  if(!S.currentCh) return;
+  const np=nowProg(S.currentCh.tvgId);
+  const nx=nextProg(S.currentCh.tvgId);
+  if(np||nx){
+    epgBox.classList.add('on');
+    epgNow.textContent=np?np.title:'Unknown';
+    if(np&&np.s&&np.e){
+      epgNowT.textContent=fmtTime(np.s)+' – '+fmtTime(np.e);
+      const pct=Math.max(0,Math.min(100,(Date.now()-np.s)/(np.e-np.s)*100));
+      epgFill.style.width=pct+'%';
+    } else { epgNowT.textContent=''; epgFill.style.width='0%'; }
+    epgNext.textContent=nx?nx.title:'—';
+    epgNextT.textContent=nx&&nx.s?'Starts '+fmtTime(nx.s):'';
+  } else {
+    epgBox.classList.remove('on');
+  }
+  // Also update hero epg text if hero is this channel
+  if(S.heroCh&&chId(S.heroCh)===chId(S.currentCh)&&np){
+    heroEpg.textContent='Now: '+np.title;
+  }
+}
+
+// ── CORS fetch ─────────────────────────────────────────────────
+const PROXIES=[
+  u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
+  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+];
+async function corsGet(url){
+  try{
+    const r=await fetch(url,{mode:'cors',signal:AbortSignal.timeout(12000)});
+    if(r.ok) return await r.text();
+  } catch(_){}
+  let last;
+  for(const mk of PROXIES){
+    try{
+      const r=await fetch(mk(url),{signal:AbortSignal.timeout(14000)});
+      if(r.ok) return await r.text();
+      last=new Error('HTTP '+r.status);
+    } catch(e){ last=e; }
+  }
+  throw last||new Error('All fetch attempts failed');
+}
+
+// ── Load playlist ──────────────────────────────────────────────
+async function loadPlaylist(raw){
+  const text=raw.trim();
+  if(!text){ toast('Paste a playlist or URL','err'); return; }
+  const isUrl=/^https?:\/\/.+\.(m3u8?|txt)(\?.*)?$/i.test(text)||
+               (/^https?:\/\//.test(text)&&!text.includes('\n')&&!text.startsWith('#'));
+  let m3u=text;
+  if(isUrl){
+    $('mdl-load').classList.add('ld');
+    try{ m3u=await corsGet(text); }
+    catch(e){ toast('Fetch failed: '+e.message,'err'); $('mdl-load').classList.remove('ld'); return; }
+    $('mdl-load').classList.remove('ld');
+    if(m3u.charCodeAt(0)===0xFEFF) m3u=m3u.slice(1);
+    const tr=m3u.trimStart();
+    if(tr.startsWith('<!')||tr.startsWith('<html')){ toast('Proxy returned HTML page','err'); return; }
+    if(tr.startsWith('{')&&tr.includes('"contents"')){
+      try{ const j=JSON.parse(m3u); if(j.contents) m3u=j.contents; } catch(_){}
+    }
+  }
+  const hasE=m3u.includes('#EXTINF'), hasM=m3u.includes('#EXTM3U'), hasU=/^https?:\/\//m.test(m3u);
+  if(!hasE&&!hasM&&!hasU){
+    toast('No M3U content found. Got: "'+m3u.slice(0,80)+'"','err',5000); return;
+  }
+  const parsed=parseM3U(m3u);
+  if(!parsed.channels.length){ toast('No channels found','err'); return; }
+
+  // Cleanup old observers before loading new playlist
+  if(S.logoObserver){ S.logoObserver.disconnect(); S.logoObserver=null; }
+
+  S.channels=parsed.channels;
+  S.epgUrl=parsed.epgUrl;
+  S.epg=null;
+  S.recents=S.recents.filter(id=>S.channels.some(c=>chId(c)===id));
+  S.deadIds=new Set();
+  S.group='All';
+  S.query='';
+  S.filteredCache=null;
+  S.filterKey='';
+  if(sbSearch) sbSearch.value='';
+
+  // Preconnect to top-5 stream hostnames
+  const hostCount={};
+  parsed.channels.forEach(c=>{
+    try{ const h=new URL(c.url).hostname; hostCount[h]=(hostCount[h]||0)+1; } catch(_){}
+  });
+  Object.entries(hostCount).sort((a,b)=>b[1]-a[1]).slice(0,5).forEach(([h])=>{
+    if(!document.querySelector(`link[rel="preconnect"][href*="${h}"]`)){
+      const l=document.createElement('link'); l.rel='preconnect'; l.href='https://'+h;
+      document.head.appendChild(l);
+    }
+  });
+
+  modalOv.classList.remove('on');
+  toast(`Loaded ${parsed.channels.length} channels`,'ok');
+  countBadge.textContent=parsed.channels.length+' ch';
+  countBadge.classList.add('on');
+  welcomeEl.style.display='none';
+
+  buildGroupTags();
+  renderBrowse();
+  renderSidebar();
+
+  // Async EPG fetch
+  if(parsed.epgUrl){
+    toast('Fetching EPG…','inf');
+    corsGet(parsed.epgUrl).then(xml=>{
+      const map=parseXMLTV(xml);
+      if(map&&map.size){ S.epg=map; toast(`EPG loaded — ${map.size} channels`,'ok'); updateEPGDisplay(); renderBrowse(); renderSidebar(); }
+    }).catch(()=>{});
+  }
+}
+
+// ── Filter (cached) ────────────────────────────────────────────
+function getFiltered(){
+  const key=S.group+'|'+S.query;
+  if(S.filteredCache&&S.filterKey===key) return S.filteredCache;
+  const q=S.query.toLowerCase();
+  let list=S.channels;
+  if(S.group==='Favourites'){
+    list=list.filter(c=>S.favorites.has(chId(c)));
+  } else if(S.group==='Recent'){
+    const rs=new Set(S.recents);
+    list=list.filter(c=>rs.has(chId(c)));
+    list=[...list].sort((a,b)=>S.recents.indexOf(chId(a))-S.recents.indexOf(chId(b)));
+  } else if(S.group!=='All'){
+    list=list.filter(c=>c.group===S.group);
+  }
+  if(q) list=list.filter(c=>c.name.toLowerCase().includes(q)||c.group.toLowerCase().includes(q));
+  S.filteredCache=list;
+  S.filterKey=key;
+  return list;
+}
+
+// ── Group tags (sidebar) ───────────────────────────────────────
+function buildGroupTags(){
+  if(!groupTags) return;
+  const groups=[...new Set(S.channels.map(c=>c.group))].sort();
+  groupTags.innerHTML='';
+  ['All','Favourites','Recent',...groups].forEach(g=>{
+    const btn=document.createElement('button');
+    btn.className='gtag'+(g===S.group?' on':'');
+    btn.textContent=g; btn.dataset.group=g;
+    groupTags.appendChild(btn);
+  });
+}
+
+// ── Virtual Scroll (sidebar) ───────────────────────────────────
+const CH_H=59, LBL_H=28, VBUF=10;
+
+function buildVRows(list){
+  const rows=[];
+  if(S.group==='All'&&!S.query){
+    if(S.recents.length){
+      const rc=S.recents.map(id=>S.channels.find(c=>chId(c)===id)).filter(Boolean);
+      if(rc.length){ rows.push({t:'lbl',text:'Recently Played'}); rc.forEach(c=>rows.push({t:'ch',ch:c})); }
+    }
+    const grp={};
+    list.forEach(c=>{ if(!grp[c.group]) grp[c.group]=[]; grp[c.group].push(c); });
+    Object.keys(grp).sort().forEach(g=>{ rows.push({t:'lbl',text:g}); grp[g].forEach(c=>rows.push({t:'ch',ch:c})); });
+  } else {
+    list.forEach(c=>rows.push({t:'ch',ch:c}));
+  }
+  const off=new Int32Array(rows.length+1);
+  for(let i=0;i<rows.length;i++) off[i+1]=off[i]+(rows[i].t==='lbl'?LBL_H:CH_H);
+  return {rows,off,total:off[rows.length]};
+}
+
+function renderSidebar(){
+  if(!chanList) return;
+  const list=getFiltered();
+  sbEmpty.style.display=list.length?'none':'';
+  chanList.style.display=list.length?'block':'none';
+  noResults.classList.toggle('on',list.length===0&&(S.query||S.group!=='All'));
+  const {rows,off,total}=buildVRows(list);
+  S.vRows=rows; S.vOffsets=off; S.vTotalH=total;
+  S.vLastStart=-1; S.vLastEnd=-1;
+  chanList.innerHTML='<div id="vs-t"></div><div id="vs-c"></div><div id="vs-b"></div>';
+  chanList.scrollTop=0;
+  renderVRows();
+  setupLogoObserver();
+}
+
+let scrollRaf=null;
+function onChanScroll(){
+  if(scrollRaf) return;
+  scrollRaf=requestAnimationFrame(()=>{ scrollRaf=null; renderVRows(); });
+}
+
+function renderVRows(){
+  const rows=S.vRows, off=S.vOffsets;
+  if(!rows||!rows.length) return;
+  // Batch reads first
+  const scrollTop=chanList.scrollTop;
+  const viewH=chanList.clientHeight;
+  // Binary search for start
+  let lo=0,hi=rows.length-1,si=0;
+  while(lo<=hi){ const mid=(lo+hi)>>>1; if(off[mid+1]<=scrollTop){lo=mid+1;}else{si=mid;hi=mid-1;} }
+  si=Math.max(0,si-VBUF);
+  let ei=si;
+  while(ei<rows.length-1&&off[ei]<scrollTop+viewH) ei++;
+  ei=Math.min(rows.length-1,ei+VBUF);
+  // Skip if same window
+  if(si===S.vLastStart&&ei===S.vLastEnd) return;
+  S.vLastStart=si; S.vLastEnd=ei;
+  // Batch writes
+  const topH=off[si], botH=Math.max(0,S.vTotalH-off[ei+1]);
+  const vt=$('vs-t'), vc=$('vs-c'), vb=$('vs-b');
+  if(!vt||!vc||!vb) return;
+  vt.style.height=topH+'px';
+  vb.style.height=botH+'px';
+  const frag=document.createDocumentFragment();
+  for(let i=si;i<=ei;i++){
+    const row=rows[i];
+    frag.appendChild(row.t==='lbl' ? makeLbl(row.text) : makeChanItem(row.ch));
+  }
+  vc.textContent='';
+  vc.appendChild(frag);
+  // Setup lazy logos for newly added items
+  if(S.logoObserver){
+    vc.querySelectorAll('img[data-src]').forEach(img=>S.logoObserver.observe(img));
+  }
+}
+
+function makeLbl(text){
+  const d=document.createElement('div');
+  d.className='sec-lbl'; d.textContent=text; return d;
+}
+
+function makeChanItem(ch){
+  const id=chId(ch);
+  const isNow=S.currentCh&&chId(S.currentCh)===id;
+  const isDead=S.deadIds.has(id);
+  const isFav=S.favorites.has(id);
+  const np=nowProg(ch.tvgId);
+
+  const item=document.createElement('div');
+  item.className='ch-item'+(isNow?' now':'')+(isDead?' dead':'');
+  item.dataset.id=id;
+
+  // Logo (lazy)
+  const logoWrap=document.createElement('div');
+  logoWrap.className='ch-logo';
+  logoWrap.style.background=gradient(ch.name);
+  const fb=document.createElement('div');
+  fb.className='ch-logo-fb'; fb.textContent=initials(ch.name);
+  logoWrap.appendChild(fb);
+  if(ch.logo){
+    const img=document.createElement('img');
+    img.dataset.src=ch.logo; img.alt=ch.name;
+    img.onerror=()=>{ img.style.display='none'; };
+    logoWrap.appendChild(img);
+  }
+
+  // Info
+  const info=document.createElement('div');
+  info.className='ch-info';
+  const nameEl=document.createElement('div');
+  nameEl.className='ch-n'; nameEl.textContent=ch.name;
+  const subEl=document.createElement('div');
+  subEl.className='ch-g'+(np?' ep':''); subEl.textContent=np?np.title:ch.group;
+  info.appendChild(nameEl); info.appendChild(subEl);
+
+  // Fav button
+  const favBtn=document.createElement('button');
+  favBtn.className='fav-btn'+(isFav?' on':'');
+  favBtn.dataset.favid=id;
+  favBtn.title=isFav?'Remove favourite':'Add favourite';
+  favBtn.textContent=isFav?'★':'☆';
+
+  item.appendChild(logoWrap); item.appendChild(info); item.appendChild(favBtn);
+  return item;
+}
+
+// Event delegation for sidebar channel list
+chanList&&chanList.addEventListener('click',e=>{
+  const favBtn=e.target.closest('.fav-btn');
+  if(favBtn){ e.stopPropagation(); toggleFav(favBtn.dataset.favid,favBtn); return; }
+  const item=e.target.closest('.ch-item');
+  if(item){
+    const id=item.dataset.id;
+    const ch=S.channels.find(c=>chId(c)===id);
+    if(ch) playChannel(ch);
+  }
+},{ passive:false });
+
+// Group tag delegation
+groupTags&&groupTags.addEventListener('click',e=>{
+  const btn=e.target.closest('.gtag');
+  if(!btn) return;
+  S.group=btn.dataset.group;
+  S.filteredCache=null;
+  document.querySelectorAll('.gtag').forEach(b=>b.classList.toggle('on',b.dataset.group===S.group));
+  renderSidebar();
+},{passive:true});
+
+// ── Lazy logo IntersectionObserver ─────────────────────────────
+function setupLogoObserver(){
+  if(S.logoObserver) S.logoObserver.disconnect();
+  S.logoObserver=new IntersectionObserver(entries=>{
+    entries.forEach(entry=>{
+      if(entry.isIntersecting){
+        const img=entry.target;
+        if(img.dataset.src){
+          img.src=img.dataset.src;
+          img.onload=()=>img.classList.add('loaded');
+          delete img.dataset.src;
+          S.logoObserver.unobserve(img);
+        }
+      }
+    });
+  },{rootMargin:'200px',root:chanList});
+}
+
+// ── Browse (Netflix) ───────────────────────────────────────────
+let heroChannel=null;
+function renderBrowse(){
+  contentArea.innerHTML='';
+  if(!S.channels.length){ welcomeEl.style.display=''; heroEl.classList.remove('on'); return; }
+  welcomeEl.style.display='none';
+
+  // Filter by tab
+  let chs=S.channels;
+  if(S.tab==='live')    chs=chs.filter(c=>detectType(c)==='live');
+  else if(S.tab==='movies')  chs=chs.filter(c=>detectType(c)==='movie');
+  else if(S.tab==='series')  chs=chs.filter(c=>detectType(c)==='series');
+  else if(S.tab==='fav')     chs=chs.filter(c=>S.favorites.has(chId(c)));
+
+  if(!chs.length){
+    heroEl.classList.remove('on');
+    const d=document.createElement('div'); d.className='empty-tab';
+    d.innerHTML='<svg width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="m8 21 4-4 4 4"/><path d="M12 17v4"/></svg>'
+      +'<h3>'+(S.tab==='fav'?'No favourites yet':'Nothing here')+'</h3>'
+      +'<p>'+(S.tab==='fav'?'Star channels to add them here.':'No content detected for this category.')+'</p>';
+    contentArea.appendChild(d); return;
+  }
+
+  // Hero
+  const heroCh=S.currentCh||(chs[Math.floor(Math.random()*Math.min(chs.length,15))]);
+  updateHero(heroCh);
+
+  // Home: carousels by type + group
+  if(S.tab==='home'){
+    if(S.recents.length){
+      const rc=S.recents.map(id=>S.channels.find(c=>chId(c)===id)).filter(Boolean);
+      if(rc.length) appendCarousel('Continue Watching',rc.slice(0,20));
+    }
+    const favChs=chs.filter(c=>S.favorites.has(chId(c)));
+    if(favChs.length) appendCarousel('My Favourites',favChs.slice(0,20));
+    const live=chs.filter(c=>detectType(c)==='live');
+    if(live.length) appendCarousel('Live TV',live.slice(0,30));
+    const movies=chs.filter(c=>detectType(c)==='movie');
+    if(movies.length) appendCarousel('Movies',movies.slice(0,30));
+    const series=chs.filter(c=>detectType(c)==='series');
+    if(series.length) appendCarousel('Series',series.slice(0,30));
+    const groups=[...new Set(chs.map(c=>c.group))].sort();
+    groups.forEach(g=>appendCarousel(g,chs.filter(c=>c.group===g).slice(0,30)));
+  } else {
+    const groups=[...new Set(chs.map(c=>c.group))].sort();
+    if(groups.length===1){ appendCarousel(groups[0],chs); }
+    else { groups.forEach(g=>appendCarousel(g,chs.filter(c=>c.group===g).slice(0,30))); }
+  }
+}
+
+function updateHero(ch){
+  if(!ch){ heroEl.classList.remove('on'); return; }
+  S.heroCh=ch;
+  heroEl.classList.add('on');
+  heroBg.style.background=ch.logo
+    ?`url(${ch.logo}) center/cover, ${gradient(ch.name)}`
+    :gradient(ch.name);
+  heroName.textContent=ch.name;
+  heroGroup.textContent=ch.group;
+  heroBadge.innerHTML=badgeHtml(detectType(ch));
+  const np=nowProg(ch.tvgId);
+  heroEpg.textContent=np?'Now: '+np.title:'';
+  $('hero-play').onclick=()=>playChannel(ch);
+  $('hero-info').onclick=()=>{
+    const card=document.querySelector('.ch-card[data-id="'+CSS.escape(chId(ch))+'"]');
+    if(card) card.scrollIntoView({behavior:'smooth',block:'center'});
   };
+}
 
-  // ===== DOM refs =====
-  const $ = id => document.getElementById(id);
-  const video        = $('main-video');
-  const bufferOverlay= $('buffering-overlay');
-  const errorOverlay = $('error-overlay');
-  const errorMsg     = $('error-msg');
-  const emptyState   = $('empty-state');
-  const nowPlaying   = $('now-playing');
-  const npName       = $('np-name');
-  const npGroup      = $('np-group');
-  const channelList  = $('channel-list');
-  const sidebarEmpty = $('sidebar-empty');
-  const noResults    = $('no-results');
-  const searchInput  = $('search-input');
-  const groupTags    = $('group-tags');
-  const countBadge   = $('channel-count-badge');
-  const modalOverlay = $('modal-overlay');
-  const playlistInput= $('playlist-input');
-  const miniPlayer   = $('mini-player');
-  const miniLabel    = $('mini-label');
-  const miniVid      = $('mini-video-thumb');
-  const dotPlayer    = $('dot-player');
-  const dotChannels  = $('dot-channels');
+function appendCarousel(title,chs){
+  if(!chs.length) return;
+  const sec=document.createElement('div'); sec.className='car-sec';
+  const hdr=document.createElement('div'); hdr.className='car-hdr';
+  const h=document.createElement('div'); h.className='car-title'; h.textContent=title;
+  hdr.appendChild(h); sec.appendChild(hdr);
+  const track=document.createElement('div'); track.className='car-track';
+  const frag=document.createDocumentFragment();
+  chs.forEach(ch=>frag.appendChild(makeCard(ch)));
+  track.appendChild(frag); sec.appendChild(track);
+  contentArea.appendChild(sec);
+}
 
-  // ===== Utility: simple hash for gradient colors =====
-  function nameHash(str) {
-    let h = 5381;
-    for (let i = 0; i < str.length; i++) h = ((h << 5) + h) ^ str.charCodeAt(i);
-    return h >>> 0;
+function makeCard(ch){
+  const id=chId(ch);
+  const type=detectType(ch);
+  const np=nowProg(ch.tvgId);
+  const isNow=S.currentCh&&chId(S.currentCh)===id;
+
+  const card=document.createElement('div');
+  card.className='ch-card'+(isNow?' now':'');
+  card.dataset.id=id;
+
+  const thumb=document.createElement('div');
+  thumb.className='ch-thumb'; thumb.style.background=gradient(ch.name);
+  const fb=document.createElement('div');
+  fb.className='ch-fallback'; fb.textContent=initials(ch.name);
+  thumb.appendChild(fb);
+
+  if(ch.logo){
+    const img=document.createElement('img');
+    img.className='ch-img'; img.dataset.src=ch.logo; img.alt=ch.name;
+    img.onerror=()=>img.style.display='none';
+    thumb.appendChild(img);
   }
-
-  function gradientFromName(name) {
-    const h = nameHash(name);
-    const hue1 = h % 360;
-    const hue2 = (hue1 + 40 + (h >> 8) % 80) % 360;
-    const sat  = 55 + (h >> 16) % 25;
-    const lit1 = 38 + (h >> 4) % 18;
-    const lit2 = 28 + (h >> 12) % 18;
-    return `linear-gradient(135deg, hsl(${hue1},${sat}%,${lit1}%) 0%, hsl(${hue2},${sat}%,${lit2}%) 100%)`;
-  }
-
-  function initials(name) {
-    const words = name.trim().split(/\s+/).filter(Boolean);
-    if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-    return (words[0][0] + words[words.length - 1][0]).toUpperCase();
-  }
-
-  function channelId(ch) {
-    return `${ch.name}||${ch.url}`;
-  }
-
-  // ===== Toast =====
-  function toast(msg, type = 'info', duration = 2500) {
-    const el = document.createElement('div');
-    el.className = `toast ${type}`;
-    el.textContent = msg;
-    $('toast-container').appendChild(el);
-    setTimeout(() => {
-      el.style.animation = 'toast-out 0.25s ease forwards';
-      setTimeout(() => el.remove(), 250);
-    }, duration);
-  }
-
-  // ===== M3U Parser =====
-  function parseM3U(text) {
-    const channels = [];
-    const seen = new Set();
-    const lines = text.split(/\r?\n/);
-    let current = null;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-
-      if (line.startsWith('#EXTINF:')) {
-        current = { name: '', group: '', logo: '', tvgId: '', url: '' };
-        // Extract attributes
-        const attrStr = line.slice(8);
-        const nameMatch = attrStr.match(/,(.+)$/);
-        if (nameMatch) current.name = nameMatch[1].trim();
-
-        const extract = (attr) => {
-          const re = new RegExp(`${attr}="([^"]*)"`, 'i');
-          const m = attrStr.match(re);
-          return m ? m[1].trim() : '';
-        };
-        current.group  = extract('group-title') || 'Uncategorized';
-        current.logo   = extract('tvg-logo');
-        current.tvgId  = extract('tvg-id');
-
-      } else if (current && !line.startsWith('#') && line.match(/^https?:\/\//i)) {
-        current.url = line;
-        if (current.name && current.url) {
-          const key = `${current.name}||${current.url}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            channels.push({ ...current });
-          }
-        }
-        current = null;
-      } else if (!line.startsWith('#') && !current && line.match(/^https?:\/\//i)) {
-        // Bare URL with no preceding #EXTINF — use URL path as name
-        const urlName = decodeURIComponent(line.split('/').pop().split('?')[0]) || line;
-        const key = `${urlName}||${line}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          channels.push({ name: urlName, group: 'Uncategorized', logo: '', tvgId: '', url: line });
-        }
-      }
-    }
-    return channels;
-  }
-
-  // ===== CORS-aware fetch =====
-  // Many IPTV playlist servers don't send CORS headers, so a direct fetch will
-  // be blocked by the browser. We try the direct URL first, then fall back to
-  // two public CORS proxies in sequence.
-  const CORS_PROXIES = [
-    url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  ];
-
-  async function fetchWithCORSFallback(url) {
-    // 1. Try direct (works when the server sends CORS headers or same-origin)
-    try {
-      const r = await fetch(url, { mode: 'cors' });
-      if (r.ok) return await r.text();
-      throw new Error(`HTTP ${r.status}`);
-    } catch (directErr) {
-      // Only fall through to proxies on CORS / network errors, not on 4xx/5xx
-      const isCORSError = directErr instanceof TypeError;
-      if (!isCORSError) throw directErr;
-    }
-
-    // 2. Try each CORS proxy in turn
-    let lastErr;
-    for (const makeProxyUrl of CORS_PROXIES) {
-      try {
-        const r = await fetch(makeProxyUrl(url));
-        if (r.ok) return await r.text();
-        lastErr = new Error(`Proxy returned HTTP ${r.status}`);
-      } catch (e) {
-        lastErr = e;
-      }
-    }
-    throw lastErr || new Error('All fetch attempts failed');
-  }
-
-  // ===== Load Playlist =====
-  async function loadPlaylist(rawInput) {
-    const text = rawInput.trim();
-    if (!text) { toast('Please paste a playlist or URL', 'error'); return; }
-
-    // Check if it's a URL to fetch
-    const isUrl = /^https?:\/\/.+\.(m3u8?|txt)(\?.*)?$/i.test(text) ||
-                  (/^https?:\/\//.test(text) && !text.includes('\n') && !text.startsWith('#'));
-
-    let m3uText = text;
-
-    if (isUrl) {
-      const loadBtn = $('modal-load-btn');
-      loadBtn.classList.add('loading');
-      try {
-        m3uText = await fetchWithCORSFallback(text);
-      } catch(e) {
-        toast(`Failed to fetch playlist: ${e.message}`, 'error');
-        $('modal-load-btn').classList.remove('loading');
-        return;
-      }
-      $('modal-load-btn').classList.remove('loading');
-
-      // Strip UTF-8 BOM if present
-      if (m3uText.charCodeAt(0) === 0xFEFF) m3uText = m3uText.slice(1);
-
-      // Detect proxy returning HTML error page instead of playlist
-      const trimmed = m3uText.trimStart();
-      if (trimmed.startsWith('<!') || trimmed.startsWith('<html')) {
-        toast('Proxy returned an HTML page — the playlist URL may be invalid or blocked', 'error');
-        return;
-      }
-
-      // Some proxies wrap content in JSON: {"contents":"..."}
-      if (trimmed.startsWith('{') && trimmed.includes('"contents"')) {
-        try {
-          const json = JSON.parse(m3uText);
-          if (json.contents) m3uText = json.contents;
-        } catch(_) {}
-      }
-    }
-
-    // Lenient check: accept if it looks like M3U or has bare stream URLs
-    const hasExtinf  = m3uText.includes('#EXTINF');
-    const hasExtm3u  = m3uText.includes('#EXTM3U');
-    const hasBareUrl = /^https?:\/\//m.test(m3uText);
-
-    if (!hasExtinf && !hasExtm3u && !hasBareUrl) {
-      // Show first 120 chars to help the user understand what arrived
-      const preview = m3uText.slice(0, 120).replace(/\n/g, '↵');
-      toast(`No M3U content found. Got: "${preview}"`, 'error', 5000);
-      return;
-    }
-
-    const channels = parseM3U(m3uText);
-    if (!channels.length) { toast('No channels found in playlist', 'error'); return; }
-
-    state.channels = channels;
-    state.recentIds = [];
-    state.deadIds = new Set();
-    state.currentGroup = 'All';
-    state.searchQuery = '';
-    searchInput.value = '';
-
-    buildGroupTags();
-    renderChannels();
-    modalOverlay.classList.remove('open');
-    toast(`Loaded ${channels.length} channel${channels.length !== 1 ? 's' : ''}`, 'success');
-  }
-
-  // ===== Build Group Tags =====
-  function buildGroupTags() {
-    const groups = [...new Set(state.channels.map(c => c.group))].sort();
-    groupTags.innerHTML = '';
-
-    const tags = ['All', 'Favorites', 'Recent', ...groups];
-    tags.forEach(g => {
-      const btn = document.createElement('button');
-      btn.className = 'group-tag' + (g === state.currentGroup ? ' active' : '');
-      btn.textContent = g;
-      btn.dataset.group = g;
-      btn.addEventListener('click', () => {
-        state.currentGroup = g;
-        document.querySelectorAll('.group-tag').forEach(b => b.classList.toggle('active', b.dataset.group === g));
-        renderChannels();
-      });
-      groupTags.appendChild(btn);
-    });
-  }
-
-  // ===== Virtual Scroll Constants =====
-  const CHANNEL_H = 59; // must match CSS height for .channel-item
-  const LABEL_H   = 28; // must match CSS height for .section-label
-  const VBUFFER   = 8;  // extra rows to render above/below viewport
-
-  // ===== Render Channels =====
-  function renderChannels() {
-    if (!state.channels.length) return;
-
-    const q = state.searchQuery.toLowerCase();
-    let list = state.channels;
-
-    // Group filter
-    if (state.currentGroup === 'Favorites') {
-      list = list.filter(c => state.favorites.has(channelId(c)));
-    } else if (state.currentGroup === 'Recent') {
-      const recentSet = new Set(state.recentIds);
-      list = list.filter(c => recentSet.has(channelId(c)));
-      list = [...list].sort((a, b) => state.recentIds.indexOf(channelId(a)) - state.recentIds.indexOf(channelId(b)));
-    } else if (state.currentGroup !== 'All') {
-      list = list.filter(c => c.group === state.currentGroup);
-    }
-
-    // Search filter
-    if (q) {
-      list = list.filter(c =>
-        c.name.toLowerCase().includes(q) || c.group.toLowerCase().includes(q)
-      );
-    }
-
-    state.filtered = list;
-
-    sidebarEmpty.style.display = 'none';
-    channelList.style.display = 'block';
-    countBadge.textContent = `${state.channels.length} ch`;
-    countBadge.classList.add('visible');
-
-    noResults.classList.toggle('visible', list.length === 0 && (q || state.currentGroup !== 'All'));
-
-    // Build flat row array for virtual scroll
-    const rows = [];
-    if (state.currentGroup === 'All' && !q) {
-      if (state.recentIds.length > 0) {
-        const recentChannels = state.recentIds
-          .map(id => state.channels.find(c => channelId(c) === id))
-          .filter(Boolean);
-        if (recentChannels.length) {
-          rows.push({ type: 'label', text: 'Recently Played' });
-          recentChannels.forEach(ch => rows.push({ type: 'channel', ch }));
-        }
-      }
-      const grouped = {};
-      list.forEach(c => {
-        if (!grouped[c.group]) grouped[c.group] = [];
-        grouped[c.group].push(c);
-      });
-      Object.keys(grouped).sort().forEach(grp => {
-        rows.push({ type: 'label', text: grp });
-        grouped[grp].forEach(ch => rows.push({ type: 'channel', ch }));
-      });
-    } else {
-      list.forEach(ch => rows.push({ type: 'channel', ch }));
-    }
-
-    // Precompute cumulative offsets for O(log n) scroll lookup
-    const offsets = new Int32Array(rows.length + 1);
-    for (let i = 0; i < rows.length; i++) {
-      offsets[i + 1] = offsets[i] + (rows[i].type === 'label' ? LABEL_H : CHANNEL_H);
-    }
-    state.vRows = rows;
-    state.vOffsets = offsets;
-    state.vTotalH = offsets[rows.length];
-
-    // Build virtual scroll scaffold
-    channelList.innerHTML =
-      '<div id="vs-top"></div><div id="vs-content"></div><div id="vs-bot"></div>';
-
-    channelList.scrollTop = 0;
-    renderVisibleRows();
-  }
-
-  function renderVisibleRows() {
-    const rows    = state.vRows;
-    const offsets = state.vOffsets;
-    if (!rows || !rows.length) return;
-
-    const scrollTop = channelList.scrollTop;
-    const viewH     = channelList.clientHeight;
-    const totalH    = state.vTotalH;
-
-    // Binary search: first row whose bottom edge is > scrollTop
-    let lo = 0, hi = rows.length - 1, startIdx = 0;
-    while (lo <= hi) {
-      const mid = (lo + hi) >>> 1;
-      if (offsets[mid + 1] <= scrollTop) { lo = mid + 1; }
-      else { startIdx = mid; hi = mid - 1; }
-    }
-    startIdx = Math.max(0, startIdx - VBUFFER);
-
-    // Last row whose top edge is < scrollTop + viewH
-    let endIdx = startIdx;
-    while (endIdx < rows.length - 1 && offsets[endIdx] < scrollTop + viewH) endIdx++;
-    endIdx = Math.min(rows.length - 1, endIdx + VBUFFER);
-
-    // Update spacer heights
-    const topH = offsets[startIdx];
-    const botH = Math.max(0, totalH - offsets[endIdx + 1]);
-    document.getElementById('vs-top').style.height = topH + 'px';
-    document.getElementById('vs-bot').style.height = botH + 'px';
-
-    // Render visible slice into a fragment
-    const frag = document.createDocumentFragment();
-    for (let i = startIdx; i <= endIdx; i++) {
-      const row = rows[i];
-      if (row.type === 'label') {
-        frag.appendChild(makeRowLabel(row.text));
-      } else {
-        frag.appendChild(makeChannelItem(row.ch));
-      }
-    }
-    const content = document.getElementById('vs-content');
-    content.innerHTML = '';
-    content.appendChild(frag);
-  }
-
-  function makeRowLabel(text) {
-    const div = document.createElement('div');
-    div.className = 'section-label';
-    div.textContent = text;
-    return div;
-  }
-
-  function makeChannelItem(ch) {
-    const id = channelId(ch);
-    const isActive = state.currentChannel && channelId(state.currentChannel) === id;
-    const isDead   = state.deadIds.has(id);
-    const isFav    = state.favorites.has(id);
-
-    const item = document.createElement('div');
-    item.className = `channel-item${isActive ? ' active' : ''}${isDead ? ' dead' : ''}`;
-    item.dataset.id = id;
-
-    // Logo
-    const logoWrap = document.createElement('div');
-    logoWrap.className = 'channel-logo-wrap';
-    if (ch.logo) {
-      const img = document.createElement('img');
-      img.className = 'channel-logo-img';
-      img.src = ch.logo;
-      img.alt = ch.name;
-      img.loading = 'lazy';
-      img.onerror = () => { img.style.display = 'none'; logoWrap.appendChild(makeFallbackLogo(ch.name)); };
-      logoWrap.appendChild(img);
-    } else {
-      logoWrap.appendChild(makeFallbackLogo(ch.name));
-    }
-
-    const info = document.createElement('div');
-    info.className = 'channel-info';
-    info.innerHTML = `<div class="channel-name">${escHtml(ch.name)}</div><div class="channel-group">${escHtml(ch.group)}</div>`;
-
-    const favBtn = document.createElement('button');
-    favBtn.className = `fav-btn${isFav ? ' active' : ''}`;
-    favBtn.title = isFav ? 'Remove from favorites' : 'Add to favorites';
-    favBtn.innerHTML = isFav ? '★' : '☆';
-    favBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleFavorite(id, favBtn); });
-
-    item.appendChild(logoWrap);
-    item.appendChild(info);
-    item.appendChild(favBtn);
-    item.addEventListener('click', () => playChannel(ch));
-    return item;
-  }
-
-  function makeFallbackLogo(name) {
-    const div = document.createElement('div');
-    div.className = 'channel-logo-fallback';
-    div.style.background = gradientFromName(name);
-    div.textContent = initials(name);
-    return div;
-  }
-
-  function escHtml(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
-  function toggleFavorite(id, btn) {
-    if (state.favorites.has(id)) {
-      state.favorites.delete(id);
-      btn.classList.remove('active');
-      btn.innerHTML = '☆';
-      btn.title = 'Add to favorites';
-    } else {
-      state.favorites.add(id);
-      btn.classList.add('active');
-      btn.innerHTML = '★';
-      btn.title = 'Remove from favorites';
-    }
-    // Re-render if in Favorites view
-    if (state.currentGroup === 'Favorites') renderChannels();
-  }
-
-  // ===== Playback =====
-  function playChannel(ch) {
-    // Save volume of previous channel
-    if (state.currentChannel) {
-      state.volumeMap[channelId(state.currentChannel)] = video.volume;
-    }
-
-    state.currentChannel = ch;
-    state.retryCount = 0;
-    clearTimeout(state.retryTimer);
-
-    // Update recently played
-    const id = channelId(ch);
-    state.recentIds = [id, ...state.recentIds.filter(x => x !== id)].slice(0, 10);
-
-    // Update UI
-    emptyState.style.display = 'none';
-    video.style.display = 'block';
-    errorOverlay.classList.remove('visible');
-    bufferOverlay.classList.add('visible');
-    nowPlaying.classList.add('visible');
-    npName.textContent = ch.name;
-    npGroup.textContent = ch.group;
-
-    // Restore volume
-    if (state.volumeMap[id] !== undefined) {
-      video.volume = state.volumeMap[id];
-    }
-
-    // Update active channel highlight
-    document.querySelectorAll('.channel-item').forEach(el => {
-      el.classList.toggle('active', el.dataset.id === id);
-    });
-
-    // Mini player label
-    miniLabel.textContent = ch.name;
-
-    // Destroy previous hls
-    if (state.hlsInstance) {
-      state.hlsInstance.destroy();
-      state.hlsInstance = null;
-    }
-
-    startStream(ch.url);
-
-    // On mobile, switch to player view when a channel is selected
-    if (window.innerWidth < 768 && state.isChannelView) {
-      setMobileView(false);
-    }
-  }
-
-  function startStream(url) {
-    const isHLS = url.includes('.m3u8') || url.includes('hls') || url.includes('/live');
-
-    if (Hls.isSupported() && isHLS) {
-      const hls = new Hls({
-        maxBufferLength: 30,
-        maxMaxBufferLength: 60,
-        lowLatencyMode: false,
-      });
-      state.hlsInstance = hls;
-      hls.loadSource(url);
-      hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(() => {});
-      });
-      hls.on(Hls.Events.ERROR, (_, data) => {
-        if (data.fatal) handleStreamError(data.details);
-      });
-    } else if (video.canPlayType('application/vnd.apple.mpegurl') && isHLS) {
-      // Safari native HLS
-      video.src = url;
-      video.load();
-      video.play().catch(() => {});
-    } else {
-      // Direct MP4 / other
-      video.src = url;
-      video.load();
-      video.play().catch(() => {});
-    }
-  }
-
-  function handleStreamError(detail) {
-    const maxRetries = 3;
-    const delays = [1000, 2000, 4000];
-
-    if (state.retryCount < maxRetries) {
-      const delay = delays[state.retryCount];
-      state.retryCount++;
-      bufferOverlay.classList.add('visible');
-      errorOverlay.classList.remove('visible');
-      toast(`Retrying stream… (${state.retryCount}/${maxRetries})`, 'info', 1800);
-
-      state.retryTimer = setTimeout(() => {
-        if (state.hlsInstance) {
-          state.hlsInstance.destroy();
-          state.hlsInstance = null;
-        }
-        startStream(state.currentChannel.url);
-      }, delay);
-    } else {
-      // Mark dead
-      const id = channelId(state.currentChannel);
-      state.deadIds.add(id);
-      bufferOverlay.classList.remove('visible');
-      errorOverlay.classList.add('visible');
-      errorMsg.textContent = `Stream unavailable after ${maxRetries} retries`;
-      // Update channel item appearance
-      const el = document.querySelector(`.channel-item[data-id="${CSS.escape(id)}"]`);
-      if (el) el.classList.add('dead');
-      toast('Stream failed — channel marked unavailable', 'error');
-    }
-  }
-
-  // ===== Video Events =====
-  video.addEventListener('waiting',  () => bufferOverlay.classList.add('visible'));
-  video.addEventListener('playing',  () => {
-    bufferOverlay.classList.remove('visible');
-    errorOverlay.classList.remove('visible');
-    state.retryCount = 0;
-  });
-  video.addEventListener('canplay',  () => bufferOverlay.classList.remove('visible'));
-  video.addEventListener('error',    () => {
-    if (state.currentChannel) handleStreamError('mediaError');
-  });
-  video.addEventListener('stalled',  () => {
-    if (state.currentChannel) {
-      setTimeout(() => {
-        if (video.paused && state.currentChannel) handleStreamError('stalled');
-      }, 8000);
+  const ov=document.createElement('div'); ov.className='ch-overlay';
+  ov.innerHTML='<div class="ch-play">▶</div>';
+  thumb.appendChild(ov);
+  const badgeWrap=document.createElement('div'); badgeWrap.className='ch-badge';
+  badgeWrap.innerHTML=badgeHtml(type); thumb.appendChild(badgeWrap);
+
+  const body=document.createElement('div'); body.className='ch-body';
+  const nameEl=document.createElement('div'); nameEl.className='ch-name'; nameEl.textContent=ch.name;
+  const epgEl=document.createElement('div');
+  epgEl.className='ch-epg'+(np?' ep':'');
+  epgEl.textContent=np?np.title:ch.group;
+  body.appendChild(nameEl); body.appendChild(epgEl);
+
+  card.appendChild(thumb); card.appendChild(body);
+  card.addEventListener('click',()=>playChannel(ch),{passive:true});
+  return card;
+}
+
+// Lazy load card images via IntersectionObserver on content area
+const cardImgObserver=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      const img=e.target;
+      if(img.dataset.src){ img.src=img.dataset.src; img.onload=()=>img.classList.add('loaded'); delete img.dataset.src; cardImgObserver.unobserve(img); }
     }
   });
+},{rootMargin:'300px'});
 
-  // ===== Retry Button =====
-  $('retry-btn').addEventListener('click', () => {
-    if (!state.currentChannel) return;
-    const id = channelId(state.currentChannel);
-    state.deadIds.delete(id);
-    state.retryCount = 0;
-    const el = document.querySelector(`.channel-item[data-id="${CSS.escape(id)}"]`);
-    if (el) el.classList.remove('dead');
-    errorOverlay.classList.remove('visible');
-    bufferOverlay.classList.add('visible');
-    if (state.hlsInstance) { state.hlsInstance.destroy(); state.hlsInstance = null; }
-    startStream(state.currentChannel.url);
-  });
+// Observe cards when content area changes (MutationObserver)
+new MutationObserver(()=>{
+  contentArea.querySelectorAll('img[data-src]').forEach(img=>cardImgObserver.observe(img));
+}).observe(contentArea,{childList:true,subtree:true});
 
-  // ===== Picture-in-Picture =====
-  $('pip-btn').addEventListener('click', async () => {
-    try {
-      if (document.pictureInPictureElement) {
-        await document.exitPictureInPicture();
-        $('pip-btn').classList.remove('active');
-      } else if (video.requestPictureInPicture) {
-        await video.requestPictureInPicture();
-        $('pip-btn').classList.add('active');
-      } else {
-        toast('PiP not supported in this browser', 'error');
-      }
-    } catch(e) {
-      toast('PiP unavailable: ' + e.message, 'error');
+// ── Tab navigation ─────────────────────────────────────────────
+function setTab(tab){
+  S.tab=tab;
+  document.querySelectorAll('.ntab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  renderBrowse();
+}
+document.querySelectorAll('.ntab').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab),{passive:true}));
+
+// ── Search overlay ─────────────────────────────────────────────
+const searchOv=$('search-ov'), searchInput=$('search-input'), searchResults=$('search-results'), sEmpty=$('s-empty');
+let searchDebounce=null;
+
+$('search-btn').addEventListener('click',()=>{ searchOv.classList.add('on'); setTimeout(()=>searchInput.focus(),40); });
+$('s-cancel').addEventListener('click',closeSearch);
+searchOv.addEventListener('click',e=>{ if(e.target===searchOv) closeSearch(); },{passive:true});
+
+function closeSearch(){ searchOv.classList.remove('on'); searchInput.value=''; renderSearch(''); }
+
+searchInput.addEventListener('input',()=>{
+  clearTimeout(searchDebounce);
+  searchDebounce=setTimeout(()=>renderSearch(searchInput.value),250);
+});
+
+function renderSearch(q){
+  const query=q.trim().toLowerCase();
+  [...searchResults.children].forEach(el=>{ if(el.id!=='s-empty') el.remove(); });
+  if(!query){ sEmpty.style.display='none'; return; }
+  const matches=S.channels.filter(c=>
+    c.name.toLowerCase().includes(query)||c.group.toLowerCase().includes(query)
+  ).slice(0,50);
+  sEmpty.style.display=matches.length?'none':'block';
+  const frag=document.createDocumentFragment();
+  matches.forEach(ch=>{
+    const item=document.createElement('div'); item.className='sr-item';
+    const thumbD=document.createElement('div'); thumbD.className='sr-thumb'; thumbD.style.background=gradient(ch.name);
+    if(ch.logo){
+      const img=document.createElement('img'); img.src=ch.logo; img.alt=ch.name; img.loading='lazy';
+      img.onerror=()=>img.remove(); thumbD.appendChild(img);
     }
+    const info=document.createElement('div'); info.className='sr-info';
+    const np=nowProg(ch.tvgId);
+    info.innerHTML='<div class="sr-name">'+esc(ch.name)+'</div>'
+      +'<div class="sr-meta">'+esc(ch.group)+(np?' · '+esc(np.title):'')+'</div>';
+    const bdg=document.createElement('span'); bdg.innerHTML=badgeHtml(detectType(ch)); 
+    item.appendChild(thumbD); item.appendChild(info); item.appendChild(bdg.firstChild);
+    item.addEventListener('click',()=>{ closeSearch(); playChannel(ch); },{passive:true});
+    frag.appendChild(item);
   });
-  video.addEventListener('leavepictureinpicture', () => $('pip-btn').classList.remove('active'));
+  searchResults.insertBefore(frag,sEmpty);
+}
 
-  // ===== Mini Player =====
-  // Observe video container visibility for mini-player on mobile
-  let miniPlayerObserver = null;
+// Sidebar search (desktop)
+let sbDebounce=null;
+sbSearch&&sbSearch.addEventListener('input',()=>{
+  clearTimeout(sbDebounce);
+  sbDebounce=setTimeout(()=>{ S.query=sbSearch.value; S.filteredCache=null; renderSidebar(); },250);
+});
 
-  function setupMiniPlayer() {
-    if (window.innerWidth >= 768) return;
-    const container = $('video-container');
-    if (miniPlayerObserver) miniPlayerObserver.disconnect();
-    miniPlayerObserver = new IntersectionObserver(entries => {
-      const entry = entries[0];
-      if (!entry.isIntersecting && state.currentChannel && !document.pictureInPictureElement) {
-        activateMiniPlayer();
-      } else {
-        deactivateMiniPlayer();
-      }
-    }, { threshold: 0.1 });
-    miniPlayerObserver.observe(container);
+// ── Favourites ─────────────────────────────────────────────────
+function toggleFav(id, btn){
+  if(S.favorites.has(id)){ S.favorites.delete(id); }
+  else { S.favorites.add(id); }
+  try{ localStorage.setItem('sv_fav',JSON.stringify([...S.favorites])); } catch(_){}
+  if(btn){ btn.classList.toggle('on',S.favorites.has(id)); btn.textContent=S.favorites.has(id)?'★':'☆'; }
+  updateFavPlayerBtn();
+  if(S.group==='Favourites'){ S.filteredCache=null; renderSidebar(); }
+  // refresh carousel card active state if visible
+  const card=contentArea.querySelector('.ch-card[data-id="'+CSS.escape(id)+'"]');
+  if(card) card.classList.toggle('now',S.currentCh&&chId(S.currentCh)===id);
+}
+function updateFavPlayerBtn(){
+  const btn=$('fav-player-btn'); if(!btn||!S.currentCh) return;
+  const on=S.favorites.has(chId(S.currentCh));
+  btn.classList.toggle('on',on);
+  btn.title=on?'Remove favourite':'Add favourite';
+  btn.innerHTML=on
+    ?'<svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>'
+    :'<svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+}
+$('fav-player-btn')&&$('fav-player-btn').addEventListener('click',()=>{
+  if(!S.currentCh) return; toggleFav(chId(S.currentCh));
+});
+
+// ── HLS single instance ────────────────────────────────────────
+let hlsReady=false;
+function ensureHLS(){
+  if(!Hls.isSupported()) return false;
+  if(!S.hlsInst){
+    S.hlsInst=new Hls({ maxBufferLength:30, maxMaxBufferLength:60, lowLatencyMode:false, enableWorker:true });
+    S.hlsInst.on(Hls.Events.MANIFEST_PARSED,()=>video.play().catch(()=>{}));
+    S.hlsInst.on(Hls.Events.ERROR,(_,data)=>{ if(data.fatal) handleError(data.details); });
+    hlsReady=true;
   }
+  return true;
+}
 
-  function activateMiniPlayer() {
-    if (!state.currentChannel || state.isMiniPlayer) return;
-    state.isMiniPlayer = true;
-    // Clone stream to mini video
-    miniVid.src = video.src;
-    if (state.hlsInstance) {
-      // Can't directly clone hls, just show placeholder
-      miniVid.src = '';
-    } else {
-      miniVid.src = video.currentSrc || video.src;
-    }
-    miniPlayer.classList.add('active');
+// ── Play channel ───────────────────────────────────────────────
+function playChannel(ch){
+  if(S.currentCh) S.volMap[chId(S.currentCh)]=video.volume;
+  clearTimeout(S.retryTimer); S.retryTimer=null; S.retryCount=0;
+
+  const id=chId(ch); S.currentCh=ch;
+  S.recents=[id,...S.recents.filter(x=>x!==id)].slice(0,20);
+  try{ localStorage.setItem('sv_rec',JSON.stringify(S.recents)); } catch(_){}
+
+  // Show player
+  playerSec.classList.add('on');
+  emptyState.style.display='none';
+  video.style.display='block';
+  errOv.classList.remove('on'); bufOv.classList.add('on');
+  playerMeta.classList.add('on');
+  pmName.textContent=ch.name;
+  pmSub.textContent=ch.group;
+  pmBadge.innerHTML=badgeHtml(detectType(ch));
+  const savedVol=S.volMap[id]; if(savedVol!==undefined) video.volume=savedVol;
+  updateFavPlayerBtn();
+  updateEPGDisplay();
+  updateHero(ch);
+
+  // Update active state on visible cards & sidebar items (reads before writes)
+  const prevId=S.currentCh?chId(S.currentCh):null;
+  requestAnimationFrame(()=>{
+    document.querySelectorAll('.ch-card').forEach(el=>el.classList.toggle('now',el.dataset.id===id));
+    document.querySelectorAll('.ch-item').forEach(el=>el.classList.toggle('now',el.dataset.id===id));
+  });
+
+  miniLbl.textContent=ch.name;
+  startStream(ch.url);
+
+  if(window.innerWidth<768&&S.isChView) setMobileView(false);
+}
+
+function startStream(url){
+  const isHLS=/\.m3u8/i.test(url)||/\bhls\b/i.test(url)||/\/live/i.test(url)||!/\.(mp4|mkv|avi|mov|wmv)(\?|$)/i.test(url);
+  if(ensureHLS()&&isHLS){
+    S.hlsInst.stopLoad();
+    S.hlsInst.detachMedia();
+    S.hlsInst.loadSource(url);
+    S.hlsInst.attachMedia(video);
+  } else if(video.canPlayType('application/vnd.apple.mpegurl')&&isHLS){
+    video.src=url; video.load(); video.play().catch(()=>{});
+  } else {
+    if(S.hlsInst){ S.hlsInst.stopLoad(); S.hlsInst.detachMedia(); }
+    video.src=url; video.load(); video.play().catch(()=>{});
   }
+}
 
-  function deactivateMiniPlayer() {
-    if (!state.isMiniPlayer) return;
-    state.isMiniPlayer = false;
-    miniPlayer.classList.remove('active');
-    miniVid.src = '';
+// ── Error / retry (exponential backoff) ───────────────────────
+const RETRY_DELAYS=[1000,3000,8000];
+function handleError(detail){
+  if(S.retryCount<3){
+    const delay=RETRY_DELAYS[S.retryCount++];
+    bufOv.classList.add('on'); errOv.classList.remove('on');
+    toast(`Retrying… (${S.retryCount}/3)`,'inf',1800);
+    S.retryTimer=setTimeout(()=>{
+      if(S.hlsInst){ S.hlsInst.stopLoad(); S.hlsInst.detachMedia(); S.hlsInst.destroy(); S.hlsInst=null; }
+      startStream(S.currentCh.url);
+    },delay);
+  } else {
+    const id=chId(S.currentCh); S.deadIds.add(id);
+    bufOv.classList.remove('on'); errOv.classList.add('on');
+    errMsg.textContent='Stream unavailable after 3 retries';
+    const el=document.querySelector('.ch-item[data-id="'+CSS.escape(id)+'"]');
+    if(el) el.classList.add('dead');
+    toast('Stream failed','err');
   }
+}
 
-  miniPlayer.addEventListener('click', (e) => {
-    if (e.target === $('mini-close-btn')) return;
-    // Scroll back to player / switch to player view
-    if (window.innerWidth < 768) setMobileView(false);
-    else $('video-container').scrollIntoView({ behavior: 'smooth' });
-    deactivateMiniPlayer();
-  });
+// ── Video events ───────────────────────────────────────────────
+video.addEventListener('waiting',  ()=>bufOv.classList.add('on'));
+video.addEventListener('playing',  ()=>{ bufOv.classList.remove('on'); errOv.classList.remove('on'); S.retryCount=0; });
+video.addEventListener('canplay',  ()=>bufOv.classList.remove('on'));
+video.addEventListener('error',    ()=>{ if(S.currentCh) handleError('mediaError'); });
+video.addEventListener('stalled',  ()=>{
+  if(S.currentCh) setTimeout(()=>{ if(video.paused&&S.currentCh) handleError('stalled'); },8000);
+});
+video.addEventListener('volumechange',()=>{ if(S.currentCh) S.volMap[chId(S.currentCh)]=video.volume; });
 
-  $('mini-close-btn').addEventListener('click', (e) => {
-    e.stopPropagation();
-    deactivateMiniPlayer();
-  });
+$('retry-btn').addEventListener('click',()=>{
+  if(!S.currentCh) return;
+  const id=chId(S.currentCh); S.deadIds.delete(id); S.retryCount=0;
+  const el=document.querySelector('.ch-item[data-id="'+CSS.escape(id)+'"]');
+  if(el) el.classList.remove('dead');
+  errOv.classList.remove('on'); bufOv.classList.add('on');
+  if(S.hlsInst){ S.hlsInst.stopLoad(); S.hlsInst.detachMedia(); S.hlsInst.destroy(); S.hlsInst=null; }
+  startStream(S.currentCh.url);
+});
 
-  // ===== Mobile Swipe =====
-  let touchStartX = 0;
-  let touchStartY = 0;
-  const swipeContainer = $('swipe-container');
+// ── PiP ───────────────────────────────────────────────────────
+$('pip-btn').addEventListener('click',async()=>{
+  try{
+    if(document.pictureInPictureElement){ await document.exitPictureInPicture(); $('pip-btn').classList.remove('on'); }
+    else if(video.requestPictureInPicture){ await video.requestPictureInPicture(); $('pip-btn').classList.add('on'); }
+    else toast('PiP not supported','err');
+  } catch(e){ toast('PiP: '+e.message,'err'); }
+});
+video.addEventListener('leavepictureinpicture',()=>$('pip-btn').classList.remove('on'));
 
-  function setMobileView(showChannels) {
-    if (window.innerWidth >= 768) return;
-    state.isChannelView = showChannels;
-    document.body.classList.toggle('channel-view', showChannels);
-    dotPlayer.classList.toggle('active', !showChannels);
-    dotChannels.classList.toggle('active', showChannels);
-    if (!showChannels) deactivateMiniPlayer();
+// ── Mini player ────────────────────────────────────────────────
+function setupMiniPlayer(){
+  if(window.innerWidth>=768) return;
+  const container=$('player-wrap'); if(!container) return;
+  if(S.miniObserver) S.miniObserver.disconnect();
+  S.miniObserver=new IntersectionObserver(entries=>{
+    const e=entries[0];
+    if(!e.isIntersecting&&S.currentCh&&!document.pictureInPictureElement) activateMini();
+    else deactivateMini();
+  },{threshold:0.1});
+  S.miniObserver.observe(container);
+}
+function activateMini(){
+  if(!S.currentCh||S.isMini) return;
+  S.isMini=true;
+  miniVid.src=S.hlsInst?'':video.currentSrc||video.src;
+  miniPlayer.classList.add('on');
+}
+function deactivateMini(){
+  if(!S.isMini) return;
+  S.isMini=false; miniPlayer.classList.remove('on'); miniVid.src='';
+}
+miniPlayer.addEventListener('click',e=>{
+  if(e.target===$('mini-x')) return;
+  if(window.innerWidth<768) setMobileView(false);
+  deactivateMini();
+},{passive:true});
+$('mini-x').addEventListener('click',e=>{ e.stopPropagation(); deactivateMini(); });
+
+// ── Mobile swipe ───────────────────────────────────────────────
+let tx=0,ty=0;
+function setMobileView(showCh){
+  if(window.innerWidth>=768) return;
+  S.isChView=showCh;
+  document.body.classList.toggle('chview',showCh);
+  dotP.classList.toggle('on',!showCh); dotC.classList.toggle('on',showCh);
+  if(!showCh) deactivateMini();
+}
+const appEl=$('app');
+appEl&&appEl.addEventListener('touchstart',e=>{ tx=e.touches[0].clientX; ty=e.touches[0].clientY; },{passive:true});
+appEl&&appEl.addEventListener('touchend',e=>{
+  if(window.innerWidth>=768) return;
+  const dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty;
+  if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)*1.5){
+    if(dx<0&&!S.isChView) setMobileView(true);
+    if(dx>0&&S.isChView)  setMobileView(false);
   }
+},{passive:true});
+dotP.addEventListener('click',()=>setMobileView(false),{passive:true});
+dotC.addEventListener('click',()=>setMobileView(true),{passive:true});
 
-  swipeContainer.addEventListener('touchstart', e => {
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-  }, { passive: true });
+// ── Modal ──────────────────────────────────────────────────────
+function openModal(){ modalOv.classList.add('on'); setTimeout(()=>plinput.focus(),50); }
+$('load-btn').addEventListener('click',openModal);
+$('welcome-btn').addEventListener('click',openModal);
+$('mdl-x').addEventListener('click',()=>modalOv.classList.remove('on'));
+$('mdl-cancel').addEventListener('click',()=>modalOv.classList.remove('on'));
+modalOv.addEventListener('click',e=>{ if(e.target===modalOv) modalOv.classList.remove('on'); },{passive:true});
+$('mdl-load').addEventListener('click',async()=>{ await loadPlaylist(plinput.value); if(!modalOv.classList.contains('on')) plinput.value=''; });
+plinput.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&e.key==='Enter') $('mdl-load').click(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ modalOv.classList.remove('on'); closeSearch(); } });
 
-  swipeContainer.addEventListener('touchend', e => {
-    if (window.innerWidth >= 768) return;
-    const dx = e.changedTouches[0].clientX - touchStartX;
-    const dy = e.changedTouches[0].clientY - touchStartY;
-    // Only register horizontal swipes
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      if (dx < 0 && !state.isChannelView) setMobileView(true);   // swipe left → channels
-      if (dx > 0 && state.isChannelView)  setMobileView(false);  // swipe right → player
-    }
-  }, { passive: true });
+// ── Scroll listeners ───────────────────────────────────────────
+chanList&&chanList.addEventListener('scroll',onChanScroll,{passive:true});
 
-  // Dot taps
-  dotPlayer.addEventListener('click', () => setMobileView(false));
-  dotChannels.addEventListener('click', () => setMobileView(true));
+// EPG refresh ticker
+setInterval(()=>{ if(S.currentCh) updateEPGDisplay(); },60000);
 
-  // ===== Search =====
-  searchInput.addEventListener('input', () => {
-    state.searchQuery = searchInput.value;
-    renderChannels();
-  });
-
-  // ===== Modal =====
-  $('load-btn').addEventListener('click', () => {
-    modalOverlay.classList.add('open');
-    setTimeout(() => playlistInput.focus(), 50);
-  });
-  $('modal-close-btn').addEventListener('click', () => modalOverlay.classList.remove('open'));
-  $('modal-cancel-btn').addEventListener('click', () => modalOverlay.classList.remove('open'));
-  modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) modalOverlay.classList.remove('open'); });
-
-  $('modal-load-btn').addEventListener('click', async () => {
-    await loadPlaylist(playlistInput.value);
-  });
-
-  // Ctrl/Cmd+Enter to load
-  playlistInput.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-      $('modal-load-btn').click();
-    }
-  });
-
-  // Escape to close modal
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') modalOverlay.classList.remove('open');
-  });
-
-  // ===== Window resize =====
-  window.addEventListener('resize', () => {
-    if (window.innerWidth >= 768) {
-      document.body.classList.remove('channel-view');
-      state.isChannelView = false;
-      deactivateMiniPlayer();
-    }
-    setupMiniPlayer();
-  });
-
-  // ===== Virtual Scroll Listener =====
-  channelList.addEventListener('scroll', () => {
-    if (state.vRows && state.vRows.length) renderVisibleRows();
-  }, { passive: true });
-
-  // ===== Init =====
+// ── Resize ────────────────────────────────────────────────────
+window.addEventListener('resize',()=>{
+  if(window.innerWidth>=768){ document.body.classList.remove('chview'); S.isChView=false; deactivateMini(); }
   setupMiniPlayer();
+},{passive:true});
 
-  // Demo / development helper — load from URL param ?playlist=<url>
-  const urlParams = new URLSearchParams(location.search);
-  const paramPlaylist = urlParams.get('playlist');
-  if (paramPlaylist) {
-    playlistInput.value = paramPlaylist;
-    loadPlaylist(paramPlaylist);
-  }
-
-  </script>
+// ── Init ──────────────────────────────────────────────────────
+setupMiniPlayer();
+const pp=new URLSearchParams(location.search).get('playlist');
+if(pp){ plinput.value=pp; loadPlaylist(pp); }
+</script>
 </body>
 </html>
