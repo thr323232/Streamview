@@ -1,34 +1,12 @@
 {
   "name": "streamview",
-  "version": "1.0.0",
-  "description": "IPTV M3U player",
+  "version": "2.0.0",
+  "description": "Bare-bones IPTV player",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "build-win": "electron-builder --win",
-    "build-mac": "electron-builder --mac",
-    "build-linux": "electron-builder --linux"
-  },
-  "build": {
-    "appId": "com.streamview.app",
-    "productName": "Streamview",
-    "files": ["index.html", "main.js"],
-    "win": {
-      "target": "nsis",
-      "icon": "icon.ico"
-    },
-    "mac": {
-      "target": "dmg",
-      "icon": "icon.icns",
-      "category": "public.app-category.entertainment"
-    },
-    "linux": {
-      "target": "AppImage",
-      "category": "AudioVideo"
-    }
+    "start": "electron ."
   },
   "devDependencies": {
-    "electron": "^33.0.0",
-    "electron-builder": "^25.0.0"
+    "electron": "^28.0.0"
   }
 }
