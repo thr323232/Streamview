@@ -1061,23 +1061,72 @@ const PROXIES=[
   u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
   u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
 ];
+
+// Stream a Response body as text, showing a live download-progress toast.
+async function streamText(response, label){
+  const contentLength=+response.headers.get('content-length')||0;
+  const reader=response.body?.getReader();
+  if(!reader) return response.text();
+  const decoder=new TextDecoder();
+  const parts=[];
+  let received=0, lastToast=0;
+  while(true){
+    const {done,value}=await reader.read();
+    if(done) break;
+    parts.push(decoder.decode(value,{stream:true}));
+    received+=value.byteLength;
+    const now=Date.now();
+    if(label&&now-lastToast>600){
+      lastToast=now;
+      const mb=(received/1048576).toFixed(1);
+      const pct=contentLength?` (${Math.round(received/contentLength*100)}%)` :'';
+      toast(`${label} ${mb} MB${pct}…`,'inf',60000);
+    }
+  }
+  parts.push(decoder.decode());
+  return parts.join('');
+}
+
+// Short-timeout fetch for small API / JSON calls.
 async function corsGet(url){
-  // Electron: no CORS restrictions, just fetch directly
   if(IS_ELECTRON){
-    const r=await fetch(url,{signal:AbortSignal.timeout(20000)});
-    if(r.ok) return await r.text();
+    const r=await fetch(url,{signal:AbortSignal.timeout(30000)});
+    if(r.ok) return r.text();
     throw new Error('HTTP '+r.status);
   }
-  // Browser: try direct first, then proxies
   try{
-    const r=await fetch(url,{mode:'cors',signal:AbortSignal.timeout(12000)});
-    if(r.ok) return await r.text();
+    const r=await fetch(url,{mode:'cors',signal:AbortSignal.timeout(20000)});
+    if(r.ok) return r.text();
   } catch(_){}
   let last;
   for(const mk of PROXIES){
     try{
-      const r=await fetch(mk(url),{signal:AbortSignal.timeout(14000)});
-      if(r.ok) return await r.text();
+      const r=await fetch(mk(url),{signal:AbortSignal.timeout(25000)});
+      if(r.ok) return r.text();
+      last=new Error('HTTP '+r.status);
+    } catch(e){ last=e; }
+  }
+  throw last||new Error('All fetch attempts failed');
+}
+
+// Long-timeout streaming fetch for large files (M3U playlists, XMLTV EPG).
+// Shows live MB progress.  Direct first, proxy fallback.
+async function fetchLarge(url, label){
+  const T=300000; // 5 minutes — EPG files can exceed 100 MB
+  if(IS_ELECTRON){
+    const r=await fetch(url,{signal:AbortSignal.timeout(T)});
+    if(r.ok) return streamText(r,label);
+    throw new Error('HTTP '+r.status);
+  }
+  try{
+    const r=await fetch(url,{mode:'cors',signal:AbortSignal.timeout(T)});
+    if(r.ok) return streamText(r,label);
+  } catch(_){}
+  let last;
+  for(const mk of PROXIES){
+    try{
+      const r=await fetch(mk(url),{signal:AbortSignal.timeout(T)});
+      if(r.ok) return streamText(r,label);
       last=new Error('HTTP '+r.status);
     } catch(e){ last=e; }
   }
@@ -1093,7 +1142,7 @@ async function loadPlaylist(raw){
   let m3u=text;
   if(isUrl){
     $('mdl-load').classList.add('ld');
-    try{ m3u=await corsGet(text); }
+    try{ m3u=await fetchLarge(text,'Downloading playlist'); }
     catch(e){ toast('Fetch failed: '+e.message,'err'); $('mdl-load').classList.remove('ld'); return; }
     $('mdl-load').classList.remove('ld');
     if(m3u.charCodeAt(0)===0xFEFF) m3u=m3u.slice(1);
@@ -1153,11 +1202,11 @@ async function loadPlaylist(raw){
 
   // Async EPG fetch
   if(parsed.epgUrl){
-    toast('Fetching EPG…','inf');
-    corsGet(parsed.epgUrl).then(xml=>{
+    fetchLarge(parsed.epgUrl,'Downloading EPG').then(xml=>{
       const map=parseXMLTV(xml);
       if(map&&map.size){ S.epg=map; toast(`EPG loaded — ${map.size} channels`,'ok'); updateEPGDisplay(); renderBrowse(); renderSidebar(); if(S.tab==='guide') openEPGGuide(); }
-    }).catch(()=>{});
+      else toast('EPG loaded but no programmes found','inf');
+    }).catch(e=>toast('EPG fetch failed: '+e.message,'inf'));
   }
 }
 
@@ -1984,8 +2033,7 @@ async function connectXtream(){
 
     // 6. Auto-fetch EPG from Xtream's XMLTV endpoint
     const epgUrl=`${server}/xmltv.php?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`;
-    toast('Fetching EPG from Xtream…','inf');
-    corsGet(epgUrl).then(xml=>{
+    fetchLarge(epgUrl,'Downloading EPG').then(xml=>{
       const map=parseXMLTV(xml);
       if(map&&map.size){
         S.epg=map;
@@ -1995,7 +2043,7 @@ async function connectXtream(){
       } else {
         toast('No EPG data returned by server','inf');
       }
-    }).catch(()=>toast('EPG unavailable from this server','inf'));
+    }).catch(e=>toast('EPG fetch failed: '+e.message,'inf'));
 
   } finally {
     loadBtn.disabled=false;
