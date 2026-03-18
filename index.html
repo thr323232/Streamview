@@ -117,8 +117,9 @@ html,body{
   align-items:center;justify-content:center;gap:10px;
 }
 #idle{text-align:center;color:var(--t3);padding:0 24px}
-#idle svg{display:block;margin:0 auto 10px;opacity:.15}
-#idle p{font-size:13px}
+#idle svg{display:block;margin:0 auto 12px;opacity:.12}
+#idle-title{font-size:15px;font-weight:600;color:var(--t2);margin-bottom:4px}
+#idle p{font-size:13px;margin-bottom:16px}
 .spinner{
   width:36px;height:36px;border:3px solid rgba(255,255,255,.1);
   border-top-color:var(--acc);border-radius:50%;
@@ -186,15 +187,29 @@ input.field{height:34px;padding:0 10px;font-size:13px}
 .hint{font-size:11px;color:var(--t3);margin-top:6px;line-height:1.6}
 .hint code{color:var(--acc)}
 .mf{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
-/* ── Modal tabs ── */
-.modal-tabs{display:flex;border-bottom:1px solid var(--b);flex-shrink:0}
-.mtab{
-  flex:1;padding:9px 0;background:none;border:none;border-bottom:2px solid transparent;
-  color:var(--t2);font-size:13px;font-weight:500;font-family:inherit;
-  cursor:pointer;transition:all .15s;margin-bottom:-1px;
+/* ── Login modal ── */
+.login-modal{max-width:380px;position:relative}
+.lm-close{
+  position:absolute;top:13px;right:13px;background:none;border:none;
+  color:var(--t2);font-size:18px;cursor:pointer;line-height:1;padding:4px 6px;z-index:1;
 }
-.mtab.on{color:var(--acc);border-bottom-color:var(--acc)}
-.mtab:hover:not(.on){color:var(--t)}
+.lm-close:hover{color:var(--t)}
+.lm-head{text-align:center;padding:34px 24px 18px}
+.lm-icon{
+  width:54px;height:54px;border-radius:14px;background:var(--acc);
+  display:flex;align-items:center;justify-content:center;margin:0 auto 14px;
+}
+.lm-title{font-size:21px;font-weight:800;letter-spacing:-.4px}
+.lm-sub{font-size:13px;color:var(--t2);margin-top:5px}
+.lm-body{padding:0 24px 28px;display:flex;flex-direction:column;gap:10px}
+.field-lg{height:44px;font-size:14px}
+.btn-full{width:100%;height:44px;justify-content:center;font-size:14px;font-weight:600;margin-top:2px}
+.switch-link{
+  background:none;border:none;font-family:inherit;font-size:12px;
+  color:var(--t2);cursor:pointer;padding:0;text-align:center;
+  transition:color .15s;
+}
+.switch-link:hover{color:var(--t)}
 
 /* ── Mobile ── */
 @media(max-width:680px){
@@ -210,7 +225,7 @@ input.field{height:34px;padding:0 10px;font-size:13px}
 <nav id="nav">
   <div class="logo">Stream<b>view</b></div>
   <button class="btn btn-g" id="proxy-btn">⚙ Proxy</button>
-  <button class="btn btn-p" id="load-btn">Load Playlist</button>
+  <button class="btn btn-p" id="load-btn">⚡ Connect</button>
 </nav>
 
 <div id="app">
@@ -225,11 +240,13 @@ input.field{height:34px;padding:0 10px;font-size:13px}
           <button class="btn btn-g" id="retry-btn">Retry</button>
         </div>
         <div id="idle">
-          <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24">
+          <svg width="52" height="52" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24">
             <rect x="2" y="3" width="20" height="14" rx="2"/>
             <path d="m8 21 4-4 4 4"/><line x1="12" y1="17" x2="12" y2="21"/>
           </svg>
-          <p>Load a playlist and select a channel</p>
+          <div id="idle-title">Streamview</div>
+          <p>Sign in to start watching</p>
+          <button class="btn btn-p" id="idle-connect" style="height:40px;padding:0 24px;font-size:14px">⚡ Connect</button>
         </div>
       </div>
     </div>
@@ -252,44 +269,43 @@ input.field{height:34px;padding:0 10px;font-size:13px}
   </div>
 </div>
 
-<!-- Load Playlist Modal -->
+<!-- Login Modal -->
 <div class="ov" id="pl-ov">
-  <div class="modal">
-    <div class="mh">
-      <span class="mh-title">Load Playlist</span>
-      <button class="mx" id="pl-close">✕</button>
+  <div class="modal login-modal">
+    <button class="lm-close" id="pl-close">✕</button>
+    <div class="lm-head">
+      <div class="lm-icon">
+        <svg width="26" height="26" fill="none" stroke="#fff" stroke-width="2" viewBox="0 0 24 24">
+          <rect x="2" y="3" width="20" height="14" rx="2"/>
+          <path d="m8 21 4-4 4 4"/><line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+      </div>
+      <div class="lm-title">Streamview</div>
+      <div class="lm-sub" id="lm-sub">Sign in with Xtream Codes</div>
     </div>
-    <div class="modal-tabs">
-      <button class="mtab on" id="tab-m3u">M3U URL</button>
-      <button class="mtab" id="tab-xt">Xtream Codes</button>
+    <!-- Xtream panel (default) -->
+    <div class="lm-body" id="panel-xt">
+      <input class="field field-lg" id="xt-server" type="url"
+        placeholder="Server URL — http://server:port"
+        autocomplete="off" spellcheck="false"/>
+      <input class="field field-lg" id="xt-user" type="text"
+        placeholder="Username" autocomplete="off"/>
+      <input class="field field-lg" id="xt-pass" type="password"
+        placeholder="Password" autocomplete="off"/>
+      <button class="btn btn-p btn-full" id="pl-load">Connect</button>
+      <button class="switch-link" id="switch-m3u">Use M3U URL instead</button>
+      <button class="btn btn-g" id="pl-clear"
+        style="font-size:11px;height:26px;align-self:center;padding:0 10px">
+        Clear saved credentials
+      </button>
     </div>
-    <div class="mb">
-      <!-- M3U panel -->
-      <div id="panel-m3u">
-        <label class="lbl">M3U URL or paste playlist content</label>
-        <textarea class="field" id="pl-inp" rows="5"
-          placeholder="https://example.com/playlist.m3u&#10;&#10;— or paste:&#10;#EXTM3U&#10;#EXTINF:-1 group-title=&quot;News&quot;,Channel&#10;https://stream.url/live.m3u8"></textarea>
-        <p class="hint">
-          Paste an M3U URL or raw content. If you get CORS errors, deploy
-          <code>worker.js</code> to Cloudflare and add the URL via ⚙ Proxy.
-        </p>
-      </div>
-      <!-- Xtream Codes panel -->
-      <div id="panel-xt" style="display:none">
-        <label class="lbl">Server URL</label>
-        <input class="field" id="xt-server" type="url" placeholder="http://server:port"
-          autocomplete="off" spellcheck="false"/>
-        <label class="lbl">Username</label>
-        <input class="field" id="xt-user" type="text" placeholder="username" autocomplete="off"/>
-        <label class="lbl">Password</label>
-        <input class="field" id="xt-pass" type="password" placeholder="password" autocomplete="off"/>
-        <p class="hint">Fetches your full M3U playlist via the Xtream Codes API.</p>
-      </div>
-      <div class="mf">
-        <button class="btn btn-g" id="pl-clear" style="margin-right:auto">Clear saved</button>
-        <button class="btn btn-g" id="pl-cancel">Cancel</button>
-        <button class="btn btn-p" id="pl-load">Load</button>
-      </div>
+    <!-- M3U panel -->
+    <div class="lm-body" id="panel-m3u" style="display:none">
+      <textarea class="field" id="pl-inp" rows="5"
+        placeholder="https://example.com/playlist.m3u&#10;&#10;— or paste M3U content directly"></textarea>
+      <p class="hint">If you hit CORS errors, configure your Cloudflare worker via ⚙ Proxy.</p>
+      <button class="btn btn-p btn-full" id="pl-load-m3u">Load</button>
+      <button class="switch-link" id="switch-xt">Use Xtream Codes instead</button>
     </div>
   </div>
 </div>
@@ -822,41 +838,45 @@ $('sb-search').addEventListener('input', e => {
   searchTimer = setTimeout(() => { S.query = e.target.value; applyFilter(); }, 250);
 }, { passive: true });
 
-// ── Load Playlist Modal ───────────────────────────────────────
-let activeTab = 'm3u';
+// ── Login Modal ───────────────────────────────────────────────
+let loginMode = 'xt'; // 'xt' | 'm3u'
 
-function switchTab(tab) {
-  activeTab = tab;
-  $('tab-m3u').classList.toggle('on', tab === 'm3u');
-  $('tab-xt').classList.toggle('on',  tab === 'xt');
-  $('panel-m3u').style.display = tab === 'm3u' ? '' : 'none';
-  $('panel-xt').style.display  = tab === 'xt'  ? '' : 'none';
+function switchMode(mode) {
+  loginMode = mode;
+  $('panel-xt').style.display  = mode === 'xt'  ? '' : 'none';
+  $('panel-m3u').style.display = mode === 'm3u' ? '' : 'none';
+  $('lm-sub').textContent = mode === 'xt' ? 'Sign in with Xtream Codes' : 'Load an M3U playlist';
+  setTimeout(() => (mode === 'xt' ? $('xt-server') : $('pl-inp')).focus(), 50);
 }
 
 function openPl() {
   $('pl-ov').classList.add('on');
-  setTimeout(() => (activeTab === 'm3u' ? $('pl-inp') : $('xt-server')).focus(), 50);
+  setTimeout(() => (loginMode === 'xt' ? $('xt-server') : $('pl-inp')).focus(), 50);
 }
+
+function closePl() { $('pl-ov').classList.remove('on'); }
 
 function loadXtream() {
   const server = $('xt-server').value.trim().replace(/\/+$/, '');
   const user   = $('xt-user').value.trim();
   const pass   = $('xt-pass').value.trim();
-  if (!server || !user || !pass) { toast('Fill in all three Xtream fields', 'err'); return; }
+  if (!server || !user || !pass) { toast('Fill in all three fields', 'err'); return; }
   try { new URL(server); } catch (_) { toast('Invalid server URL', 'err'); return; }
   const url = `${server}/get.php?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}&type=m3u_plus&output=ts`;
   try { localStorage.setItem('sv_xt', JSON.stringify({ server, user, pass })); } catch (_) {}
   loadPlaylist(url);
 }
 
-$('tab-m3u').addEventListener('click', () => switchTab('m3u'));
-$('tab-xt').addEventListener('click',  () => switchTab('xt'));
 $('load-btn').addEventListener('click', openPl);
-$('pl-close').addEventListener('click',  () => $('pl-ov').classList.remove('on'));
-$('pl-cancel').addEventListener('click', () => $('pl-ov').classList.remove('on'));
-$('pl-ov').addEventListener('click', e => { if (e.target === $('pl-ov')) $('pl-ov').classList.remove('on'); }, { passive: true });
-$('pl-load').addEventListener('click', () => { if (activeTab === 'xt') loadXtream(); else loadPlaylist($('pl-inp').value); });
-$('pl-inp').addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') $('pl-load').click(); });
+$('idle-connect').addEventListener('click', openPl);
+$('pl-close').addEventListener('click', closePl);
+$('pl-ov').addEventListener('click', e => { if (e.target === $('pl-ov')) closePl(); }, { passive: true });
+$('switch-m3u').addEventListener('click', () => switchMode('m3u'));
+$('switch-xt').addEventListener('click',  () => switchMode('xt'));
+$('pl-load').addEventListener('click', loadXtream);
+$('pl-load-m3u').addEventListener('click', () => loadPlaylist($('pl-inp').value));
+$('pl-inp').addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') loadPlaylist($('pl-inp').value); });
+$('xt-pass').addEventListener('keydown', e => { if (e.key === 'Enter') loadXtream(); });
 $('pl-clear').addEventListener('click', () => {
   localStorage.removeItem('sv_url');
   localStorage.removeItem('sv_xt');
@@ -895,16 +915,13 @@ $('proxy-remove').addEventListener('click', () => {
 });
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') {
-    $('pl-ov').classList.remove('on');
-    $('proxy-ov').classList.remove('on');
-  }
+  if (e.key === 'Escape') { closePl(); $('proxy-ov').classList.remove('on'); }
 });
 
 // ── Init ──────────────────────────────────────────────────────
 showState('idle');
 
-// Restore Xtream credentials into fields
+// Pre-fill saved credentials and open the login modal
 const savedXt = localStorage.getItem('sv_xt');
 if (savedXt) {
   try {
@@ -912,21 +929,14 @@ if (savedXt) {
     $('xt-server').value = server || '';
     $('xt-user').value   = user   || '';
     $('xt-pass').value   = pass   || '';
-    if (server && user && pass) {
-      switchTab('xt');
-      const url = `${server}/get.php?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}&type=m3u_plus&output=ts`;
-      toast('Restoring Xtream playlist…', 'inf', 2000);
-      loadPlaylist(url);
-    }
   } catch (_) {}
+  switchMode('xt');
 } else {
-  const saved = localStorage.getItem('sv_url');
-  if (saved) {
-    $('pl-inp').value = saved;
-    toast('Restoring playlist…', 'inf', 2000);
-    loadPlaylist(saved);
-  }
+  const savedM3u = localStorage.getItem('sv_url');
+  if (savedM3u) { $('pl-inp').value = savedM3u; switchMode('m3u'); }
+  else switchMode('xt');
 }
+openPl();
 </script>
 </body>
 </html>
