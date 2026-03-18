@@ -1111,26 +1111,53 @@ async function corsGet(url){
 
 // Long-timeout streaming fetch for large files (M3U playlists, XMLTV EPG).
 // Shows live MB progress.  Direct first, proxy fallback.
-async function fetchLarge(url, label){
+// Optional validate(text)=>bool — if provided, content that fails validation
+// is treated as a fetch failure so the next source is tried.
+async function fetchLarge(url, label, validate){
   const T=300000; // 5 minutes — EPG files can exceed 100 MB
+
+  async function tryResponse(r){
+    if(!r.ok) return null;
+    const text=await streamText(r,label);
+    if(validate&&!validate(text)) return null;
+    return text;
+  }
+
   if(IS_ELECTRON){
     const r=await fetch(url,{signal:AbortSignal.timeout(T)});
-    if(r.ok) return streamText(r,label);
+    const t=await tryResponse(r);
+    if(t!=null) return t;
     throw new Error('HTTP '+r.status);
   }
+
+  // Try direct (CORS)
   try{
     const r=await fetch(url,{mode:'cors',signal:AbortSignal.timeout(T)});
-    if(r.ok) return streamText(r,label);
+    const t=await tryResponse(r);
+    if(t!=null) return t;
   } catch(_){}
+
+  // Proxy fallback
   let last;
   for(const mk of PROXIES){
     try{
       const r=await fetch(mk(url),{signal:AbortSignal.timeout(T)});
-      if(r.ok) return streamText(r,label);
+      const t=await tryResponse(r);
+      if(t!=null) return t;
       last=new Error('HTTP '+r.status);
     } catch(e){ last=e; }
   }
   throw last||new Error('All fetch attempts failed');
+}
+
+// Returns true when text looks like an M3U playlist.
+function looksLikeM3U(text){
+  if(!text) return false;
+  const t=text.trimStart();
+  // Reject obvious non-M3U responses: HTML pages, XML (EPG/XMLTV), JSON errors
+  if(/^<[!?]?[a-zA-Z]/.test(t)) return false;
+  if(/^\{/.test(t)&&!t.includes('#EXTINF')&&!t.includes('#EXTM3U')) return false;
+  return t.includes('#EXTINF')||t.includes('#EXTM3U')||/^https?:\/\//m.test(t)||/^rtsp?:\/\//m.test(t)||/^rtmp:\/\//m.test(t);
 }
 
 // ── Load playlist ──────────────────────────────────────────────
@@ -1142,19 +1169,25 @@ async function loadPlaylist(raw){
   let m3u=text;
   if(isUrl){
     $('mdl-load').classList.add('ld');
-    try{ m3u=await fetchLarge(text,'Downloading playlist'); }
-    catch(e){ toast('Fetch failed: '+e.message,'err'); $('mdl-load').classList.remove('ld'); return; }
+    let fetchErr;
+    try{ m3u=await fetchLarge(text,'Downloading playlist',looksLikeM3U); }
+    catch(e){ fetchErr=e; }
     $('mdl-load').classList.remove('ld');
+    if(fetchErr){
+      // fetchLarge exhausted all sources — show what the last proxy returned
+      // (already in fetchErr.message) plus a hint
+      toast('Could not load playlist: '+fetchErr.message,'err',6000);
+      return;
+    }
     if(m3u.charCodeAt(0)===0xFEFF) m3u=m3u.slice(1);
+    // Unwrap allorigins /get JSON envelope (shouldn't happen with /raw but just in case)
     const tr=m3u.trimStart();
-    if(tr.startsWith('<!')||tr.startsWith('<html')){ toast('Proxy returned HTML page','err'); return; }
     if(tr.startsWith('{')&&tr.includes('"contents"')){
       try{ const j=JSON.parse(m3u); if(j.contents) m3u=j.contents; } catch(_){}
     }
   }
-  const hasE=m3u.includes('#EXTINF'), hasM=m3u.includes('#EXTM3U'), hasU=/^https?:\/\//m.test(m3u);
-  if(!hasE&&!hasM&&!hasU){
-    toast('No M3U content found. Got: "'+m3u.slice(0,80)+'"','err',5000); return;
+  if(!looksLikeM3U(m3u)){
+    toast('No M3U content found — got: "'+m3u.slice(0,120)+'"','err',7000); return;
   }
   toast('Parsing playlist…','inf',60000);
   const parsed=await parseM3U(m3u);
