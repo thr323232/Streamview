@@ -329,6 +329,96 @@ body{font-family:'Outfit',system-ui,sans-serif;background:var(--bg);color:var(--
   #dots{display:none!important}
 }
 
+/* ── EPG Guide ───────────────────────────────────────────────── */
+#epg-guide{display:none;flex:1;flex-direction:column;overflow:hidden;min-height:0}
+#epg-guide.on{display:flex}
+
+/* Filter bar above the grid */
+#epg-filter{flex-shrink:0;display:flex;align-items:center;gap:10px;
+  padding:10px 14px;background:var(--bg2);border-bottom:1px solid var(--border)}
+#epg-search-wrap{position:relative;width:200px;flex-shrink:0}
+#epg-search-wrap svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);
+  color:var(--t3);pointer-events:none}
+#epg-q{width:100%;height:34px;background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--r);padding:0 10px 0 32px;color:var(--t1);
+  font-family:'Outfit',sans-serif;font-size:13px;outline:none}
+#epg-q:focus{border-color:var(--acc)}
+#epg-q::placeholder{color:var(--t3)}
+#epg-groups{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;flex:1}
+#epg-groups::-webkit-scrollbar{display:none}
+.egtag{flex-shrink:0;padding:3px 10px;border-radius:99px;border:1px solid var(--border);
+  background:transparent;color:var(--t2);font-family:'Outfit',sans-serif;
+  font-size:11px;font-weight:500;cursor:pointer;transition:all var(--ease)}
+.egtag:hover{border-color:var(--acc);color:var(--acc2)}
+.egtag.on{background:var(--acc);border-color:var(--acc);color:#fff}
+
+/* Scroll container — one element that scrolls in both directions */
+#epg-scroll{flex:1;overflow:auto;position:relative;-webkit-overflow-scrolling:touch;min-height:0}
+
+/* Sticky time header row */
+.epg-thead{position:sticky;top:0;z-index:20;display:flex;height:38px;
+  background:var(--bg2);border-bottom:2px solid var(--border)}
+/* Corner cell: sticky on both axes — placed inside sticky thead */
+.epg-corner{position:sticky;left:0;z-index:31;width:160px;flex-shrink:0;
+  background:var(--bg2);border-right:1px solid var(--border);
+  display:flex;align-items:center;padding-left:12px;
+  font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--t3)}
+/* Time labels strip — total width set via JS */
+.epg-time-strip{position:relative;flex-shrink:0}
+.epg-t-lbl{position:absolute;top:0;height:100%;display:flex;align-items:center;
+  padding-left:6px;font-size:11px;font-weight:600;color:var(--t2);white-space:nowrap;
+  border-left:1px solid var(--border)}
+
+/* Channel rows */
+.epg-row{display:flex;height:56px;border-bottom:1px solid rgba(255,255,255,.04)}
+.epg-row:hover .epg-ch-cell{background:var(--bg4)}
+.epg-row.playing .epg-ch-cell{background:rgba(108,99,255,.1)}
+.epg-row.playing .epg-ch-cell::before{content:'';position:absolute;left:0;top:0;bottom:0;
+  width:3px;background:var(--acc);border-radius:0 2px 2px 0}
+
+/* Sticky channel column */
+.epg-ch-cell{position:sticky;left:0;z-index:10;width:160px;flex-shrink:0;
+  display:flex;align-items:center;gap:9px;padding:0 10px;
+  background:var(--bg2);border-right:1px solid var(--border);cursor:pointer;
+  transition:background var(--ease);position:relative}
+.epg-ch-logo{width:36px;height:36px;border-radius:5px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:12px;font-weight:700;color:rgba(255,255,255,.9)}
+.epg-ch-logo img{width:100%;height:100%;object-fit:contain}
+.epg-ch-name{font-size:12px;font-weight:500;color:var(--t1);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+
+/* Program blocks — total width set via JS, position:absolute inside */
+.epg-progs-row{position:relative;flex-shrink:0;height:56px}
+.epg-prog{position:absolute;top:3px;height:calc(100% - 6px);
+  border-radius:5px;overflow:hidden;cursor:pointer;
+  background:var(--bg3);border:1px solid rgba(255,255,255,.06);
+  padding:0 8px;display:flex;flex-direction:column;justify-content:center;
+  transition:background var(--ease),border-color var(--ease)}
+.epg-prog:hover{background:var(--bg4);border-color:var(--border2)}
+.epg-prog.current{background:rgba(108,99,255,.15);border-color:rgba(108,99,255,.35)}
+.epg-prog.no-epg{background:rgba(255,255,255,.03);border-style:dashed}
+.epg-prog-title{font-size:12px;font-weight:500;color:var(--t1);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.epg-prog-time{font-size:10px;color:var(--t3);margin-top:1px;white-space:nowrap}
+/* Progress bar inside current program */
+.epg-prog-progress{position:absolute;bottom:0;left:0;height:2px;background:var(--acc);
+  border-radius:0 0 0 5px}
+
+/* Live "now" vertical line */
+#epg-now-line{position:absolute;top:0;width:2px;background:var(--live);
+  z-index:5;pointer-events:none}
+#epg-now-line::after{content:'';position:absolute;top:0;left:50%;
+  transform:translateX(-50%);width:8px;height:8px;border-radius:50%;
+  background:var(--live)}
+
+@media(max-width:767px){
+  .epg-ch-cell{width:100px;padding:0 6px;gap:6px}
+  .epg-corner{width:100px}
+  .epg-ch-logo{width:28px;height:28px;font-size:10px}
+  .epg-ch-name{font-size:11px}
+  #epg-search-wrap{width:140px}
+}
+
 /* ── Mobile swipe layout ─────────────────────────────────────── */
 #swipe-wrap{flex:1;display:flex;overflow:hidden;min-height:0}
 #player-panel{min-width:100%;transition:transform .3s cubic-bezier(.25,.46,.45,.94);
@@ -421,7 +511,8 @@ body{font-family:'Outfit',system-ui,sans-serif;background:var(--bg);color:var(--
 <nav id="nav">
   <div class="nav-logo"><div class="nav-logo-icon">▶</div><span class="nav-logo-text">Streamview</span></div>
   <div id="nav-tabs">
-    <button class="ntab active" data-tab="home">Home</button>
+    <button class="ntab active" data-tab="guide">Guide</button>
+    <button class="ntab" data-tab="home">Home</button>
     <button class="ntab" data-tab="live">Live TV</button>
     <button class="ntab" data-tab="movies">Movies</button>
     <button class="ntab" data-tab="series">Series</button>
@@ -524,6 +615,31 @@ body{font-family:'Outfit',system-ui,sans-serif;background:var(--bg);color:var(--
         </div>
         <div id="content-area"></div>
       </div>
+
+      <!-- EPG Guide (shown when tab=guide) -->
+      <div id="epg-guide">
+        <div id="epg-filter">
+          <div id="epg-search-wrap">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="search" id="epg-q" placeholder="Filter channels…" autocomplete="off"/>
+          </div>
+          <div id="epg-groups"></div>
+        </div>
+        <div id="epg-scroll">
+          <!-- Time header — sticky top -->
+          <div class="epg-thead">
+            <div class="epg-corner">Channels</div>
+            <div class="epg-time-strip" id="epg-time-strip"></div>
+          </div>
+          <!-- Virtual scroll spacers + visible rows -->
+          <div id="epg-vs-top"></div>
+          <div id="epg-rows"></div>
+          <div id="epg-vs-bot"></div>
+          <!-- "Now" time indicator -->
+          <div id="epg-now-line"></div>
+        </div>
+      </div>
+
     </div><!-- /page -->
   </div><!-- /player-panel -->
 
@@ -604,7 +720,7 @@ body{font-family:'Outfit',system-ui,sans-serif;background:var(--bg);color:var(--
 const S = {
   channels:      [],
   currentCh:     null,
-  tab:           'home',
+  tab:           'guide',
   group:         'All',
   query:         '',
   favorites:     new Set(),
@@ -923,7 +1039,9 @@ async function loadPlaylist(raw){
   welcomeEl.style.display='none';
 
   buildGroupTags();
-  renderBrowse();
+  buildEPGGroupTags();
+  if(S.tab==='guide') openEPGGuide();
+  else renderBrowse();
   renderSidebar();
 
   // Async EPG fetch
@@ -931,7 +1049,7 @@ async function loadPlaylist(raw){
     toast('Fetching EPG…','inf');
     corsGet(parsed.epgUrl).then(xml=>{
       const map=parseXMLTV(xml);
-      if(map&&map.size){ S.epg=map; toast(`EPG loaded — ${map.size} channels`,'ok'); updateEPGDisplay(); renderBrowse(); renderSidebar(); }
+      if(map&&map.size){ S.epg=map; toast(`EPG loaded — ${map.size} channels`,'ok'); updateEPGDisplay(); renderBrowse(); renderSidebar(); if(S.tab==='guide') openEPGGuide(); }
     }).catch(()=>{});
   }
 }
@@ -1278,7 +1396,11 @@ new MutationObserver(()=>{
 function setTab(tab){
   S.tab=tab;
   document.querySelectorAll('.ntab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
-  renderBrowse();
+  const isGuide=tab==='guide';
+  $('epg-guide').classList.toggle('on', isGuide);
+  browseEl.style.display=isGuide?'none':'';
+  if(isGuide) openEPGGuide();
+  else renderBrowse();
 }
 document.querySelectorAll('.ntab').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab),{passive:true}));
 
@@ -1397,6 +1519,7 @@ function playChannel(ch){
   });
 
   miniLbl.textContent=ch.name;
+  if(S.tab==='guide') updateEPGRowHighlights();
   startStream(ch.url);
 
   if(window.innerWidth<768&&S.isChView) setMobileView(false);
@@ -1580,8 +1703,259 @@ window.addEventListener('resize',()=>{
   setupMiniPlayer();
 },{passive:true});
 
+// ── EPG Guide ─────────────────────────────────────────────────
+const PX_MIN   = 4;    // pixels per minute
+const EPG_ROW  = 56;   // px per channel row
+const EPG_TH   = 38;   // px for time header
+const EPG_CHW  = window.innerWidth < 768 ? 100 : 160; // channel col width
+const EPG_MINS = 480;  // total minutes shown (8 hours)
+const EPG_VBUF = 6;    // extra rows outside viewport
+
+let epgChannels   = [];   // currently filtered channel list for guide
+let epgStartMs    = 0;    // left edge of the timeline (ms timestamp)
+let epgGroup      = 'All';
+let epgQuery      = '';
+let epgVStart     = -1;
+let epgVEnd       = -1;
+let epgScrollRAF  = null;
+let epgNowTimer   = null;
+
+function openEPGGuide(){
+  // Build group tags if not yet built
+  buildEPGGroupTags();
+  // Calculate time window: 30-min rounded, starting 1 h before "now"
+  const now   = Date.now();
+  const round = Math.floor(now/(30*60000))*(30*60000);
+  epgStartMs  = round - 60*60000;
+  epgVStart=-1; epgVEnd=-1;
+  buildEPGChannelList();
+  buildEPGTimeline();
+  buildEPGRows();
+  scrollEPGToNow();
+  // Refresh the now-line every minute
+  clearInterval(epgNowTimer);
+  epgNowTimer=setInterval(()=>{ positionNowLine(); updateEPGRowHighlights(); },60000);
+}
+
+function buildEPGGroupTags(){
+  const eg=$('epg-groups'); if(!eg||!S.channels.length) return;
+  eg.innerHTML='';
+  const groups=[...new Set(S.channels.map(c=>c.group))].sort();
+  ['All',...groups].forEach(g=>{
+    const b=document.createElement('button');
+    b.className='egtag'+(g===epgGroup?' on':'');
+    b.textContent=g; b.dataset.g=g;
+    eg.appendChild(b);
+  });
+}
+
+function buildEPGChannelList(){
+  const q=epgQuery.toLowerCase();
+  let list=S.channels;
+  if(epgGroup!=='All') list=list.filter(c=>c.group===epgGroup);
+  if(q) list=list.filter(c=>c.name.toLowerCase().includes(q)||c.group.toLowerCase().includes(q));
+  epgChannels=list;
+}
+
+function buildEPGTimeline(){
+  const strip=$('epg-time-strip'); if(!strip) return;
+  const totalPx=EPG_MINS*PX_MIN;
+  strip.style.width=totalPx+'px';
+  strip.innerHTML='';
+  for(let m=0;m<EPG_MINS;m+=30){
+    const t=new Date(epgStartMs+m*60000);
+    const lbl=document.createElement('div');
+    lbl.className='epg-t-lbl';
+    lbl.style.left=(m*PX_MIN)+'px';
+    lbl.style.width=(30*PX_MIN)+'px';
+    lbl.textContent=t.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    strip.appendChild(lbl);
+  }
+  positionNowLine();
+}
+
+function positionNowLine(){
+  const line=$('epg-now-line'); if(!line) return;
+  const now=Date.now();
+  const endMs=epgStartMs+EPG_MINS*60000;
+  if(now<epgStartMs||now>endMs){ line.style.display='none'; return; }
+  const leftPx=EPG_CHW+Math.round((now-epgStartMs)/60000*PX_MIN);
+  const totalH=EPG_TH+epgChannels.length*EPG_ROW;
+  line.style.display='block';
+  line.style.left=leftPx+'px';
+  line.style.top='0';
+  line.style.height=totalH+'px';
+}
+
+function scrollEPGToNow(){
+  const el=$('epg-scroll'); if(!el) return;
+  const now=Date.now();
+  const nowPx=EPG_CHW+Math.round((now-epgStartMs)/60000*PX_MIN);
+  // Center the now-line in the viewport
+  requestAnimationFrame(()=>{
+    el.scrollLeft=Math.max(0, nowPx-el.clientWidth/2+EPG_CHW/2);
+  });
+}
+
+function buildEPGRows(){
+  // Set up spacers for virtual scroll
+  $('epg-vs-top').style.height='0px';
+  $('epg-vs-bot').style.height=(epgChannels.length*EPG_ROW)+'px';
+  $('epg-rows').innerHTML='';
+  epgVStart=-1; epgVEnd=-1;
+  renderEPGRows();
+}
+
+function renderEPGRows(){
+  const scroll=$('epg-scroll'); if(!scroll||!epgChannels.length) return;
+  const scrollTop=Math.max(0, scroll.scrollTop-EPG_TH);
+  const viewH=scroll.clientHeight-EPG_TH;
+  let start=Math.max(0, Math.floor(scrollTop/EPG_ROW)-EPG_VBUF);
+  let end  =Math.min(epgChannels.length-1, Math.ceil((scrollTop+viewH)/EPG_ROW)+EPG_VBUF);
+  if(start===epgVStart&&end===epgVEnd) return;
+  epgVStart=start; epgVEnd=end;
+  $('epg-vs-top').style.height=(start*EPG_ROW)+'px';
+  $('epg-vs-bot').style.height=(Math.max(0,epgChannels.length-1-end)*EPG_ROW)+'px';
+  const frag=document.createDocumentFragment();
+  for(let i=start;i<=end;i++) frag.appendChild(makeEPGRow(epgChannels[i]));
+  const rows=$('epg-rows');
+  rows.textContent='';
+  rows.appendChild(frag);
+}
+
+function makeEPGRow(ch){
+  const id=chId(ch);
+  const isPlaying=S.currentCh&&chId(S.currentCh)===id;
+  const row=document.createElement('div');
+  row.className='epg-row'+(isPlaying?' playing':'');
+  row.dataset.id=id;
+
+  // Channel cell (sticky left)
+  const cell=document.createElement('div');
+  cell.className='epg-ch-cell';
+  const logo=document.createElement('div');
+  logo.className='epg-ch-logo';
+  logo.style.background=gradient(ch.name);
+  if(ch.logo){
+    const img=document.createElement('img');
+    img.src=ch.logo; img.alt=ch.name; img.loading='lazy';
+    img.onerror=()=>img.remove();
+    logo.appendChild(img);
+  } else {
+    logo.textContent=initials(ch.name);
+  }
+  const nm=document.createElement('div');
+  nm.className='epg-ch-name'; nm.textContent=ch.name;
+  cell.appendChild(logo); cell.appendChild(nm);
+
+  // Programs row (absolute-positioned blocks)
+  const progsRow=document.createElement('div');
+  progsRow.className='epg-progs-row';
+  progsRow.style.width=(EPG_MINS*PX_MIN)+'px';
+
+  const endMs=epgStartMs+EPG_MINS*60000;
+  const progs=S.epg&&ch.tvgId ? S.epg.get(ch.tvgId) : null;
+
+  if(progs&&progs.length){
+    const now=Date.now();
+    progs
+      .filter(p=>p.e>epgStartMs&&p.s<endMs)
+      .forEach(p=>{
+        const cs=Math.max(p.s,epgStartMs);
+        const ce=Math.min(p.e,endMs);
+        const leftPx=Math.round((cs-epgStartMs)/60000*PX_MIN);
+        const wPx   =Math.max(2,Math.round((ce-cs)/60000*PX_MIN)-2);
+        const isCur =p.s<=now&&p.e>now;
+
+        const blk=document.createElement('div');
+        blk.className='epg-prog'+(isCur?' current':'');
+        blk.style.left=leftPx+'px';
+        blk.style.width=wPx+'px';
+
+        const t=document.createElement('div');
+        t.className='epg-prog-title'; t.textContent=p.title;
+        blk.appendChild(t);
+        if(wPx>80){
+          const tm=document.createElement('div');
+          tm.className='epg-prog-time';
+          tm.textContent=fmtTime(p.s)+(p.e?'–'+fmtTime(p.e):'');
+          blk.appendChild(tm);
+        }
+        if(isCur){
+          const pct=Math.max(0,Math.min(100,(now-p.s)/(p.e-p.s)*100));
+          const bar=document.createElement('div');
+          bar.className='epg-prog-progress';
+          bar.style.width=pct+'%';
+          blk.appendChild(bar);
+        }
+        progsRow.appendChild(blk);
+      });
+  } else {
+    // No EPG data — one solid "on air" / "on demand" block
+    const blk=document.createElement('div');
+    blk.className='epg-prog no-epg';
+    blk.style.left='0px';
+    blk.style.width=(EPG_MINS*PX_MIN-2)+'px';
+    const t=document.createElement('div');
+    t.className='epg-prog-title';
+    t.textContent=detectType(ch)==='live'?'On Air':ch.name;
+    blk.appendChild(t);
+    progsRow.appendChild(blk);
+  }
+
+  row.appendChild(cell);
+  row.appendChild(progsRow);
+  return row;
+}
+
+function updateEPGRowHighlights(){
+  // Cheaply refresh playing row highlight without full re-render
+  $('epg-rows').querySelectorAll('.epg-row').forEach(el=>{
+    const isPlaying=S.currentCh&&el.dataset.id===chId(S.currentCh);
+    el.classList.toggle('playing',isPlaying);
+  });
+}
+
+// Event delegation — clicks on channel cell or program block
+$('epg-scroll').addEventListener('click',e=>{
+  const cell=e.target.closest('.epg-ch-cell');
+  const prog=e.target.closest('.epg-prog');
+  const row=(cell||prog)?.closest('.epg-row');
+  if(!row) return;
+  const ch=epgChannels.find(c=>chId(c)===row.dataset.id);
+  if(ch) playChannel(ch);
+},{passive:true});
+
+// Scroll handler — virtual rows
+$('epg-scroll').addEventListener('scroll',()=>{
+  if(epgScrollRAF) return;
+  epgScrollRAF=requestAnimationFrame(()=>{ epgScrollRAF=null; renderEPGRows(); });
+},{passive:true});
+
+// Group tag delegation
+$('epg-groups').addEventListener('click',e=>{
+  const b=e.target.closest('.egtag'); if(!b) return;
+  epgGroup=b.dataset.g;
+  document.querySelectorAll('.egtag').forEach(x=>x.classList.toggle('on',x.dataset.g===epgGroup));
+  buildEPGChannelList(); buildEPGRows(); positionNowLine();
+},{passive:true});
+
+// Search
+let epgDebounce=null;
+$('epg-q').addEventListener('input',()=>{
+  clearTimeout(epgDebounce);
+  epgDebounce=setTimeout(()=>{
+    epgQuery=$('epg-q').value;
+    buildEPGChannelList(); buildEPGRows(); positionNowLine();
+  },250);
+});
+
 // ── Init ──────────────────────────────────────────────────────
 setupMiniPlayer();
+
+// Default tab is Guide — hide browse, show EPG container (empty until playlist loads)
+browseEl.style.display='none';
+$('epg-guide').classList.add('on');
 
 // URL param takes priority (dev/testing use)
 const pp=new URLSearchParams(location.search).get('playlist');
