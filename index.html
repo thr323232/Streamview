@@ -328,10 +328,15 @@ function toast(msg, type = 'inf', dur = 2500) {
   el.className = 'toast ' + type;
   el.textContent = msg;
   $('toasts').appendChild(el);
-  setTimeout(() => {
+  let tid;
+  const dismiss = () => {
+    clearTimeout(tid);
     el.style.animation = 'to2 .2s ease forwards';
     setTimeout(() => el.remove(), 220);
-  }, dur);
+  };
+  if (dur > 0) tid = setTimeout(dismiss, dur);
+  el.dismiss = dismiss;
+  return el;
 }
 
 function nameHash(s) {
@@ -371,7 +376,7 @@ async function streamText(response, label) {
   if (!reader) return response.text();
   const dec = new TextDecoder();
   const parts = [];
-  let recv = 0, lastT = 0;
+  let recv = 0, lastT = 0, progToast = null;
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -382,9 +387,12 @@ async function streamText(response, label) {
       lastT = now;
       const mb = (recv / 1048576).toFixed(1);
       const pct = cl ? ` (${Math.round(recv / cl * 100)}%)` : '';
-      toast(`${label} ${mb} MB${pct}…`, 'inf', 60000);
+      const msg = `${label} ${mb} MB${pct}…`;
+      if (progToast) progToast.textContent = msg;
+      else progToast = toast(msg, 'inf', 0);
     }
   }
+  if (progToast) progToast.dismiss();
   parts.push(dec.decode());
   return parts.join('');
 }
@@ -527,8 +535,9 @@ async function loadPlaylist(raw) {
     return;
   }
 
-  toast('Parsing…', 'inf', 60000);
+  const parsingToast = toast('Parsing…', 'inf', 0);
   const parsed = await parseM3U(m3u);
+  parsingToast.dismiss();
   if (!parsed.channels.length) { toast('No channels found', 'err'); return; }
 
   S.channels = parsed.channels;
