@@ -763,7 +763,7 @@ function destroyHLS() {
 function startStream(url) {
   destroyHLS();
   // Treat anything without a clear non-HLS extension as HLS
-  const isHLS = !/\.(mp4|mkv|avi|mov|wmv|ts)(\?|$)/i.test(url);
+  const isHLS = !/\.(mp4|mkv|avi|mov|wmv)(\?|$)/i.test(url);
 
   if (Hls.isSupported() && isHLS) {
     const hls = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 60, lowLatencyMode: false });
