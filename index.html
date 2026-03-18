@@ -419,6 +419,25 @@ body{font-family:'Outfit',system-ui,sans-serif;background:var(--bg);color:var(--
   #epg-search-wrap{width:140px}
 }
 
+/* ── Playlist modal tabs ─────────────────────────────────────── */
+.mdl-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:14px}
+.mdl-tab{padding:8px 16px;border:none;background:none;color:var(--t2);
+  font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;cursor:pointer;
+  border-bottom:2px solid transparent;margin-bottom:-1px;transition:all var(--ease)}
+.mdl-tab:hover{color:var(--t1)}
+.mdl-tab.on{color:var(--t1);border-bottom-color:var(--acc);font-weight:700}
+.mdl-pane{display:none}.mdl-pane.on{display:block}
+/* Xtream form fields */
+.xt-fields{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+.xt-row{display:flex;gap:8px}
+.xt-lbl{display:flex;flex-direction:column;gap:5px;flex:1}
+.xt-lbl span{font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.4px}
+.xt-inp{height:36px;background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--r);padding:0 10px;color:var(--t1);
+  font-family:'Outfit',sans-serif;font-size:13px;outline:none;width:100%;box-sizing:border-box}
+.xt-inp:focus{border-color:var(--acc)}
+.xt-status{font-size:12px;color:var(--t3);min-height:16px;margin-bottom:4px}
+.xt-status.ok{color:var(--ok)}.xt-status.err{color:var(--live)}
 /* ── Mobile swipe layout ─────────────────────────────────────── */
 #swipe-wrap{flex:1;display:flex;overflow:hidden;min-height:0}
 #player-panel{min-width:100%;transition:transform .3s cubic-bezier(.25,.46,.45,.94);
@@ -694,13 +713,48 @@ body{font-family:'Outfit',system-ui,sans-serif;background:var(--bg);color:var(--
       <button class="mdl-x" id="mdl-x">✕</button>
     </div>
     <div class="mdl-body">
-      <label class="mdl-lbl" for="plinput">Paste M3U content or enter a playlist URL</label>
-      <textarea id="plinput" spellcheck="false" placeholder="#EXTM3U&#10;#EXTINF:-1 group-title=&quot;News&quot; tvg-logo=&quot;https://…&quot;,Channel Name&#10;https://stream.example.com/live.m3u8&#10;&#10;— or a URL: https://example.com/playlist.m3u"></textarea>
-      <p class="mdl-hint">Supports M3U/M3U8 with <code>#EXTINF</code> entries. EPG loaded automatically from <code>url-tvg</code> if present. Your URL is saved and reloaded automatically on next launch.</p>
-      <div class="mdl-acts">
-        <button class="btn btn-g" id="mdl-clear" style="margin-right:auto" title="Forget saved playlist URL">Clear saved</button>
-        <button class="btn btn-g" id="mdl-cancel">Cancel</button>
-        <button class="btn btn-p" id="mdl-load"><span class="bt">Load</span></button>
+      <!-- Tab switcher -->
+      <div class="mdl-tabs">
+        <button class="mdl-tab on" data-pane="pane-m3u">M3U Playlist</button>
+        <button class="mdl-tab" data-pane="pane-xt">Xtream Codes</button>
+      </div>
+
+      <!-- M3U pane -->
+      <div class="mdl-pane on" id="pane-m3u">
+        <label class="mdl-lbl" for="plinput">Paste M3U content or enter a playlist URL</label>
+        <textarea id="plinput" spellcheck="false" placeholder="#EXTM3U&#10;#EXTINF:-1 group-title=&quot;News&quot; tvg-logo=&quot;https://…&quot;,Channel Name&#10;https://stream.example.com/live.m3u8&#10;&#10;— or a URL: https://example.com/playlist.m3u"></textarea>
+        <p class="mdl-hint">Supports M3U/M3U8 with <code>#EXTINF</code> entries. EPG loaded automatically from <code>url-tvg</code> if present.</p>
+        <div class="mdl-acts">
+          <button class="btn btn-g" id="mdl-clear" style="margin-right:auto" title="Forget saved playlist URL">Clear saved</button>
+          <button class="btn btn-g" id="mdl-cancel">Cancel</button>
+          <button class="btn btn-p" id="mdl-load"><span class="bt">Load</span></button>
+        </div>
+      </div>
+
+      <!-- Xtream Codes pane -->
+      <div class="mdl-pane" id="pane-xt">
+        <div class="xt-fields">
+          <div class="xt-lbl">
+            <span>Server URL</span>
+            <input class="xt-inp" id="xt-server" type="url" placeholder="http://your-provider.com:8080" autocomplete="off" autocapitalize="off" spellcheck="false"/>
+          </div>
+          <div class="xt-row">
+            <div class="xt-lbl">
+              <span>Username</span>
+              <input class="xt-inp" id="xt-user" type="text" placeholder="username" autocomplete="off" autocapitalize="off" spellcheck="false"/>
+            </div>
+            <div class="xt-lbl">
+              <span>Password</span>
+              <input class="xt-inp" id="xt-pass" type="password" placeholder="password" autocomplete="off"/>
+            </div>
+          </div>
+        </div>
+        <div class="xt-status" id="xt-status"></div>
+        <div class="mdl-acts">
+          <button class="btn btn-g" id="xt-clear" style="margin-right:auto" title="Forget saved Xtream credentials">Clear saved</button>
+          <button class="btn btn-g" id="mdl-xt-cancel">Cancel</button>
+          <button class="btn btn-p" id="xt-load"><span class="bt">Connect</span></button>
+        </div>
       </div>
     </div>
   </div>
@@ -1703,6 +1757,202 @@ window.addEventListener('resize',()=>{
   setupMiniPlayer();
 },{passive:true});
 
+// ── Modal tab switching ────────────────────────────────────────
+document.querySelectorAll('.mdl-tab').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.mdl-tab').forEach(b=>b.classList.remove('on'));
+    document.querySelectorAll('.mdl-pane').forEach(p=>p.classList.remove('on'));
+    btn.classList.add('on');
+    $(btn.dataset.pane).classList.add('on');
+  },{passive:true});
+});
+
+// ── Xtream Codes integration ───────────────────────────────────
+const XT_KEY='sv_xtream';
+
+function xtSaveCredentials(server,user,pass){
+  localStorage.setItem(XT_KEY, JSON.stringify({server:server.replace(/\/+$/,''),user,pass}));
+}
+function xtLoadCredentials(){
+  try{ return JSON.parse(localStorage.getItem(XT_KEY)||'null'); } catch(_){ return null; }
+}
+
+// Normalise the server URL — strip trailing slash, ensure no double //
+function xtBase(raw){
+  return raw.replace(/\/+$/,'');
+}
+
+function xtApiUrl(base,user,pass,action,extra=''){
+  return `${base}/player_api.php?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}&action=${action}${extra}`;
+}
+
+function xtSetStatus(msg,cls=''){
+  const el=$('xt-status'); if(!el) return;
+  el.className='xt-status'+(cls?' '+cls:'');
+  el.textContent=msg;
+}
+
+// Build stream URL directly from credentials (resolved at load time)
+function xtStreamUrl(type, id, ext, server, user, pass){
+  if(type==='live')   return `${server}/live/${user}/${pass}/${id}.m3u8`;
+  if(type==='movie')  return `${server}/movie/${user}/${pass}/${id}.${ext||'mp4'}`;
+  if(type==='series') return `${server}/series/${user}/${pass}/${id}.m3u8`;
+  return '';
+}
+
+function xtLiveToChannel(ch, catName, server, user, pass){
+  return {
+    name:   ch.name||'',
+    url:    xtStreamUrl('live', ch.stream_id, null, server, user, pass),
+    logo:   ch.stream_icon||'',
+    group:  catName||ch.category_name||'Live',
+    tvgId:  ch.epg_channel_id||String(ch.stream_id),
+    tvgName:ch.name||'',
+  };
+}
+
+function xtVodToChannel(ch, catName, server, user, pass){
+  return {
+    name:  ch.name||'',
+    url:   xtStreamUrl('movie', ch.stream_id, ch.container_extension||'mp4', server, user, pass),
+    logo:  ch.stream_icon||ch.cover||'',
+    group: catName||ch.category_name||'Movies',
+    tvgId: '', tvgName:'',
+  };
+}
+
+function xtSeriesToChannel(s, catName, server, user, pass){
+  return {
+    name:  s.name||'',
+    url:   xtStreamUrl('series', s.series_id, null, server, user, pass),
+    logo:  s.cover||s.stream_icon||'',
+    group: catName||s.category_name||'Series',
+    tvgId: '', tvgName:'',
+  };
+}
+
+async function connectXtream(){
+  const server=xtBase(($('xt-server').value||'').trim());
+  const user  =($('xt-user').value||'').trim();
+  const pass  =($('xt-pass').value||'').trim();
+  if(!server||!user||!pass){ xtSetStatus('Fill in all three fields','err'); return; }
+
+  xtSetStatus('Connecting…');
+  const loadBtn=$('xt-load');
+  loadBtn.disabled=true;
+
+  try{
+    // 1. Verify credentials
+    const infoUrl=`${server}/player_api.php?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`;
+    let info;
+    try{
+      const raw=await corsGet(infoUrl);
+      info=JSON.parse(raw);
+    } catch(_){
+      xtSetStatus('Cannot reach server — check URL and try again','err');
+      loadBtn.disabled=false; return;
+    }
+    if(!info||info.user_info?.auth===0||info.user_info?.auth==='0'||info.user_info?.status==='Disabled'){
+      xtSetStatus('Authentication failed — wrong username or password','err');
+      loadBtn.disabled=false; return;
+    }
+
+    const exp=info.user_info?.exp_date;
+    const expStr=exp? new Date(+exp*1000).toLocaleDateString():'';
+    xtSetStatus(`Connected${expStr?' · expires '+expStr:''}`, 'ok');
+
+    // 2. Fetch categories (for group names)
+    async function fetchJson(url){
+      const txt=await corsGet(url); return JSON.parse(txt);
+    }
+    const [liveCats, vodCats, seriesCats]=await Promise.all([
+      fetchJson(xtApiUrl(server,user,pass,'get_live_categories')).catch(()=>[]),
+      fetchJson(xtApiUrl(server,user,pass,'get_vod_categories')).catch(()=>[]),
+      fetchJson(xtApiUrl(server,user,pass,'get_series_categories')).catch(()=>[]),
+    ]);
+    const catMap=new Map();
+    [...liveCats,...vodCats,...seriesCats].forEach(c=>catMap.set(String(c.category_id),c.category_name));
+
+    // 3. Fetch all streams in parallel
+    xtSetStatus('Loading channels…','ok');
+    const [liveStreams, vodStreams, seriesStreams]=await Promise.all([
+      fetchJson(xtApiUrl(server,user,pass,'get_live_streams')).catch(()=>[]),
+      fetchJson(xtApiUrl(server,user,pass,'get_vod_streams')).catch(()=>[]),
+      fetchJson(xtApiUrl(server,user,pass,'get_series')).catch(()=>[]),
+    ]);
+
+    const channels=[
+      ...liveStreams.map(c=>xtLiveToChannel(c, catMap.get(String(c.category_id)), server, user, pass)),
+      ...vodStreams.map(c=>xtVodToChannel(c, catMap.get(String(c.category_id)), server, user, pass)),
+      ...seriesStreams.map(c=>xtSeriesToChannel(c, catMap.get(String(c.category_id)), server, user, pass)),
+    ];
+
+    if(!channels.length){
+      xtSetStatus('No channels found on this server','err');
+      loadBtn.disabled=false; return;
+    }
+
+    // 4. Save credentials for auto-restore on next page load
+    xtSaveCredentials(server,user,pass);
+    localStorage.setItem('sv_xt_source','xtream'); // mark source type
+
+    // 5. Load channels into app state (reuse loadPlaylist path)
+    S.channels=channels;
+    S.group='All'; S.query='';
+    buildGroupTags(); buildEPGGroupTags();
+    if(S.tab==='guide') openEPGGuide(); else renderBrowse();
+    renderSidebar();
+    modalOv.classList.remove('on');
+    toast(`Loaded ${channels.length} channels from Xtream`,'ok');
+
+    // 6. Auto-fetch EPG from Xtream's XMLTV endpoint
+    const epgUrl=`${server}/xmltv.php?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`;
+    toast('Fetching EPG from Xtream…','inf');
+    corsGet(epgUrl).then(xml=>{
+      const map=parseXMLTV(xml);
+      if(map&&map.size){
+        S.epg=map;
+        toast(`EPG loaded — ${map.size} channels`,'ok');
+        updateEPGDisplay();
+        if(S.tab==='guide') openEPGGuide();
+      } else {
+        toast('No EPG data returned by server','inf');
+      }
+    }).catch(()=>toast('EPG unavailable from this server','inf'));
+
+  } finally {
+    loadBtn.disabled=false;
+  }
+}
+
+// Auto-restore Xtream credentials on load
+function xtRestore(){
+  if(localStorage.getItem('sv_xt_source')!=='xtream') return false;
+  const creds=xtLoadCredentials(); if(!creds) return false;
+  $('xt-server').value=creds.server;
+  $('xt-user').value=creds.user;
+  $('xt-pass').value=creds.pass;
+  // Switch modal to xtream tab (so user sees it if they open the modal)
+  document.querySelectorAll('.mdl-tab').forEach(b=>b.classList.toggle('on',b.dataset.pane==='pane-xt'));
+  document.querySelectorAll('.mdl-pane').forEach(p=>p.classList.toggle('on',p.id==='pane-xt'));
+  // Auto-connect silently
+  connectXtream();
+  return true;
+}
+
+// Xtream button listeners
+$('xt-load').addEventListener('click',connectXtream);
+$('xt-clear').addEventListener('click',()=>{
+  localStorage.removeItem(XT_KEY);
+  localStorage.removeItem('sv_xt_source');
+  $('xt-server').value=''; $('xt-user').value=''; $('xt-pass').value='';
+  xtSetStatus('Credentials cleared');
+});
+$('mdl-xt-cancel').addEventListener('click',()=>modalOv.classList.remove('on'));
+['xt-server','xt-user','xt-pass'].forEach(id=>{
+  $(id).addEventListener('keydown',e=>{ if(e.key==='Enter') $('xt-load').click(); });
+});
+
 // ── EPG Guide ─────────────────────────────────────────────────
 const PX_MIN   = 4;    // pixels per minute
 const EPG_ROW  = 56;   // px per channel row
@@ -1961,12 +2211,11 @@ $('epg-guide').classList.add('on');
 const pp=new URLSearchParams(location.search).get('playlist');
 if(pp){
   plinput.value=pp; loadPlaylist(pp);
-} else {
-  // Auto-restore last playlist so the user never has to re-enter it
+} else if(!xtRestore()){
+  // Auto-restore last M3U playlist if no Xtream credentials are saved
   const saved=localStorage.getItem('sv_playlist_url');
   if(saved){
     plinput.value=saved;
-    // Show a quiet loading indicator while we fetch in background
     toast('Restoring playlist…','inf',2000);
     loadPlaylist(saved);
   }
