@@ -91,9 +91,8 @@ body{font-family:'Outfit',system-ui,sans-serif;background:var(--bg);color:var(--
 /* ── Player section ──────────────────────────────────────────── */
 #player-section{display:none}
 #player-section.on{display:block}
-#player-wrap{position:relative;width:100%;background:#000;max-width:1400px;margin:0 auto}
-#player-wrap::before{content:'';display:block;padding-top:46%}
-@media(max-width:767px){#player-wrap::before{padding-top:56.25%}}
+#player-wrap{position:relative;width:100%;background:#000;max-width:1400px;margin:0 auto;
+  aspect-ratio:16/9;}
 #main-video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:none}
 #buf-overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
   background:rgba(0,0,0,.5);z-index:10}
@@ -348,11 +347,12 @@ body{font-family:'Outfit',system-ui,sans-serif;background:var(--bg);color:var(--
 
 /* ── Desktop: player + sidebar side by side ──────────────────── */
 @media(min-width:768px){
-  #app{flex:1;display:flex;overflow:hidden;min-height:0}
+  #app{flex:1;display:flex;overflow:hidden;min-height:0;margin-top:var(--nav)}
   #player-panel{flex:1;overflow:hidden;display:flex;flex-direction:column}
   #sidebar-panel{width:320px;flex-shrink:0;display:flex;flex-direction:column;
     overflow:hidden;border-left:1px solid var(--border);background:var(--bg2)}
   #page{display:flex;flex-direction:column;height:100%;overflow:hidden;padding-top:0}
+  /* #app already clears the fixed nav via margin-top, so page needs no top padding */
   #player-section{flex-shrink:0}
   #browse{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
   /* sidebar channel list */
@@ -632,6 +632,7 @@ const S = {
   isMini:        false,
   isChView:      false,
   switching:     false,   // true during detach→attach; suppresses spurious errors
+  triedNative:   false,   // native-video fallback attempted for current channel
 };
 
 // Persist
@@ -1358,7 +1359,7 @@ function ensureHLS(){
 // ── Play channel ───────────────────────────────────────────────
 function playChannel(ch){
   if(S.currentCh) S.volMap[chId(S.currentCh)]=video.volume;
-  clearTimeout(S.retryTimer); S.retryTimer=null; S.retryCount=0;
+  clearTimeout(S.retryTimer); S.retryTimer=null; S.retryCount=0; S.triedNative=false;
 
   const id=chId(ch); S.currentCh=ch;
   S.recents=[id,...S.recents.filter(x=>x!==id)].slice(0,20);
@@ -1399,8 +1400,9 @@ function startStream(url){
     S.hlsInst.detachMedia();
     S.hlsInst.loadSource(url);
     S.hlsInst.attachMedia(video);
-    // Clear the guard once hls.js has re-attached and a small settle time has passed
-    S.hlsInst.once(Hls.Events.MEDIA_ATTACHED, ()=>{ setTimeout(()=>{ S.switching=false; }, 200); });
+    // Clear the guard after hls.js has had time to re-attach.
+    // Don't rely on .once() (not present in all hls.js builds); a fixed delay is safer.
+    setTimeout(()=>{ S.switching=false; }, 400);
   } else if(video.canPlayType('application/vnd.apple.mpegurl')&&isHLS){
     S.switching=false;
     video.src=url; video.load(); video.play().catch(()=>{});
@@ -1427,11 +1429,13 @@ function handleError(detail){
       if(S.hlsInst){ S.hlsInst.stopLoad(); S.hlsInst.detachMedia(); S.hlsInst.destroy(); S.hlsInst=null; }
       startStream(S.currentCh.url);
     },delay);
-  } else if(S.hlsInst){
-    // HLS exhausted — try native video (some streams work without hls.js)
+  } else if(S.hlsInst && !S.triedNative){
+    // HLS exhausted — try native video once (works for MP4/RTSP/non-standard streams)
+    // Leave S.retryCount at 3 so any subsequent error goes straight to the dead branch.
+    S.triedNative=true;
     toast('HLS failed — trying direct playback…','inf',2200);
     S.hlsInst.stopLoad(); S.hlsInst.detachMedia(); S.hlsInst.destroy(); S.hlsInst=null;
-    S.retryCount=0;   // give the native path its own retry budget
+    S.switching=false;
     video.src=erroredCh.url; video.load(); video.play().catch(()=>{});
   } else {
     const id=chId(S.currentCh); S.deadIds.add(id);
@@ -1459,7 +1463,7 @@ video.addEventListener('volumechange',()=>{ if(S.currentCh) S.volMap[chId(S.curr
 
 $('retry-btn').addEventListener('click',()=>{
   if(!S.currentCh) return;
-  const id=chId(S.currentCh); S.deadIds.delete(id); S.retryCount=0;
+  const id=chId(S.currentCh); S.deadIds.delete(id); S.retryCount=0; S.triedNative=false;
   const el=document.querySelector('.ch-item[data-id="'+CSS.escape(id)+'"]');
   if(el) el.classList.remove('dead');
   errOv.classList.remove('on'); bufOv.classList.add('on');
