@@ -1038,6 +1038,41 @@
     return channels;
   }
 
+  // ===== CORS-aware fetch =====
+  // Many IPTV playlist servers don't send CORS headers, so a direct fetch will
+  // be blocked by the browser. We try the direct URL first, then fall back to
+  // two public CORS proxies in sequence.
+  const CORS_PROXIES = [
+    url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  ];
+
+  async function fetchWithCORSFallback(url) {
+    // 1. Try direct (works when the server sends CORS headers or same-origin)
+    try {
+      const r = await fetch(url, { mode: 'cors' });
+      if (r.ok) return await r.text();
+      throw new Error(`HTTP ${r.status}`);
+    } catch (directErr) {
+      // Only fall through to proxies on CORS / network errors, not on 4xx/5xx
+      const isCORSError = directErr instanceof TypeError;
+      if (!isCORSError) throw directErr;
+    }
+
+    // 2. Try each CORS proxy in turn
+    let lastErr;
+    for (const makeProxyUrl of CORS_PROXIES) {
+      try {
+        const r = await fetch(makeProxyUrl(url));
+        if (r.ok) return await r.text();
+        lastErr = new Error(`Proxy returned HTTP ${r.status}`);
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    throw lastErr || new Error('All fetch attempts failed');
+  }
+
   // ===== Load Playlist =====
   async function loadPlaylist(rawInput) {
     const text = rawInput.trim();
@@ -1053,9 +1088,7 @@
       const loadBtn = $('modal-load-btn');
       loadBtn.classList.add('loading');
       try {
-        const resp = await fetch(text);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        m3uText = await resp.text();
+        m3uText = await fetchWithCORSFallback(text);
       } catch(e) {
         toast(`Failed to fetch playlist: ${e.message}`, 'error');
         $('modal-load-btn').classList.remove('loading');
