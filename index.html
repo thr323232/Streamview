@@ -452,7 +452,7 @@ body{font-family:'Outfit',system-ui,sans-serif;background:var(--bg);color:var(--
             <h3>Nothing playing</h3>
             <p>Pick a channel from the list or load a playlist to get started.</p>
           </div>
-          <video id="main-video" playsinline controls></video>
+          <video id="main-video" playsinline autoplay controls></video>
           <div id="buf-overlay"><div class="spinner"></div></div>
           <div id="err-overlay">
             <div class="err-icon">⚠</div>
@@ -1357,17 +1357,13 @@ $('fav-player-btn')&&$('fav-player-btn').addEventListener('click',()=>{
   if(!S.currentCh) return; toggleFav(chId(S.currentCh));
 });
 
-// ── HLS single instance ────────────────────────────────────────
-let hlsReady=false;
-function ensureHLS(){
-  if(!Hls.isSupported()) return false;
-  if(!S.hlsInst){
-    S.hlsInst=new Hls({ maxBufferLength:30, maxMaxBufferLength:60, lowLatencyMode:false, enableWorker:true });
-    S.hlsInst.on(Hls.Events.MANIFEST_PARSED,()=>video.play().catch(()=>{}));
-    S.hlsInst.on(Hls.Events.ERROR,(_,data)=>{ if(data.fatal&&!S.switching) handleError(data.details); });
-    hlsReady=true;
-  }
-  return true;
+// ── HLS helpers ────────────────────────────────────────────────
+function destroyHLS(){
+  if(!S.hlsInst) return;
+  S.switching=true;            // suppress error events fired during teardown
+  S.hlsInst.destroy();
+  S.hlsInst=null;
+  setTimeout(()=>{ S.switching=false; },100);
 }
 
 // ── Play channel ───────────────────────────────────────────────
@@ -1407,23 +1403,36 @@ function playChannel(ch){
 }
 
 function startStream(url){
-  const isHLS=/\.m3u8/i.test(url)||/\bhls\b/i.test(url)||/\/live/i.test(url)||!/\.(mp4|mkv|avi|mov|wmv)(\?|$)/i.test(url);
-  if(ensureHLS()&&isHLS){
-    S.switching=true;
-    S.hlsInst.stopLoad();
-    S.hlsInst.detachMedia();
-    S.hlsInst.loadSource(url);
-    S.hlsInst.attachMedia(video);
-    // Clear the guard after hls.js has had time to re-attach.
-    // Don't rely on .once() (not present in all hls.js builds); a fixed delay is safer.
-    setTimeout(()=>{ S.switching=false; }, 400);
-  } else if(video.canPlayType('application/vnd.apple.mpegurl')&&isHLS){
-    S.switching=false;
+  // Always destroy the old instance first — reuse causes broken state on fresh instances
+  // because stopLoad/detachMedia on a never-attached HLS instance prevent MANIFEST_PARSED
+  destroyHLS();
+
+  const looksLikeHLS=
+    /\.m3u8/i.test(url)  ||
+    /\bhls\b/i.test(url) ||
+    /\/live/i.test(url)  ||
+    !/\.(mp4|mkv|avi|mov|wmv|ts)(\?|$)/i.test(url);
+
+  if(Hls.isSupported() && looksLikeHLS){
+    const hls=new Hls({ maxBufferLength:30, maxMaxBufferLength:60, lowLatencyMode:false });
+    S.hlsInst=hls;
+    hls.on(Hls.Events.MANIFEST_PARSED, ()=>{
+      S.switching=false;
+      video.play().catch(()=>{});
+    });
+    hls.on(Hls.Events.ERROR, (_,data)=>{
+      if(data.fatal && !S.switching) handleError(data.details);
+    });
+    hls.loadSource(url);
+    hls.attachMedia(video);
+    // Safety: if MANIFEST_PARSED never fires (bad stream, network issue) clear the guard
+    // so error events can still propagate and trigger the retry/fallback path
+    setTimeout(()=>{ S.switching=false; }, 6000);
+  } else if(video.canPlayType('application/vnd.apple.mpegurl') && looksLikeHLS){
+    // Safari native HLS
     video.src=url; video.load(); video.play().catch(()=>{});
   } else {
-    S.switching=true;
-    if(S.hlsInst){ S.hlsInst.stopLoad(); S.hlsInst.detachMedia(); }
-    S.switching=false;
+    // Direct MP4 / other
     video.src=url; video.load(); video.play().catch(()=>{});
   }
 }
@@ -1440,7 +1449,6 @@ function handleError(detail){
     toast(`Retrying… (${S.retryCount}/3)`,'inf',1800);
     S.retryTimer=setTimeout(()=>{
       if(S.currentCh!==erroredCh) return; // user switched away — abort
-      if(S.hlsInst){ S.hlsInst.stopLoad(); S.hlsInst.detachMedia(); S.hlsInst.destroy(); S.hlsInst=null; }
       startStream(S.currentCh.url);
     },delay);
   } else if(S.hlsInst && !S.triedNative){
@@ -1448,8 +1456,7 @@ function handleError(detail){
     // Leave S.retryCount at 3 so any subsequent error goes straight to the dead branch.
     S.triedNative=true;
     toast('HLS failed — trying direct playback…','inf',2200);
-    S.hlsInst.stopLoad(); S.hlsInst.detachMedia(); S.hlsInst.destroy(); S.hlsInst=null;
-    S.switching=false;
+    destroyHLS();
     video.src=erroredCh.url; video.load(); video.play().catch(()=>{});
   } else {
     const id=chId(S.currentCh); S.deadIds.add(id);
@@ -1481,7 +1488,6 @@ $('retry-btn').addEventListener('click',()=>{
   const el=document.querySelector('.ch-item[data-id="'+CSS.escape(id)+'"]');
   if(el) el.classList.remove('dead');
   errOv.classList.remove('on'); bufOv.classList.add('on');
-  if(S.hlsInst){ S.hlsInst.stopLoad(); S.hlsInst.detachMedia(); S.hlsInst.destroy(); S.hlsInst=null; }
   startStream(S.currentCh.url);
 });
 
